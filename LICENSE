@@ -1,3 +1,19 @@
+Copyright 2025 Ira Rainey
+
+This repository contains two components under different licences:
+
+  - HALO Protocol Specification (halo-specification.md):
+    Licensed under the Creative Commons Attribution 4.0 International
+    License (CC BY 4.0). See LICENSE-SPECIFICATION for details.
+
+  - halohttp Reference Implementation (all source code):
+    Licensed under the Apache License, Version 2.0.
+
+Unless otherwise noted, all source code files are licensed under the
+Apache License, Version 2.0.
+
+===========================================================================
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -186,7 +202,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright [yyyy] [name of copyright owner]
+   Copyright 2025 Ira Rainey
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

@@ -5,6 +5,14 @@ requires-python = ">=3.13"
 [options]
 prerelease-mode = "allow"
 
+[manifest]
+members = [
+    "halo",
+    "halo-sample-agent",
+    "halo-sample-api",
+    "halohttp",
+]
+
 [[package]]
 name = "agent-framework-core"
 version = "1.0.0rc2"
@@ -492,17 +500,13 @@ wheels = [
 ]
 
 [[package]]
-name = "halohttp"
+name = "halo"
 version = "0.0.1"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
-    { name = "agent-framework-core" },
-    { name = "aiohttp" },
-    { name = "fastapi" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-    { name = "uvicorn", extra = ["standard"] },
+    { name = "halo-sample-agent" },
+    { name = "halo-sample-api" },
+    { name = "halohttp" },
 ]
 
 [package.dev-dependencies]
@@ -516,13 +520,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-framework-core", specifier = "==1.0.0rc2" },
-    { name = "aiohttp", specifier = ">=3.13.3" },
-    { name = "fastapi", specifier = ">=0.129.0" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-settings", specifier = ">=2.13.1" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.41.0" },
+    { name = "halo-sample-agent", editable = "sample-agent" },
+    { name = "halo-sample-api", editable = "sample-api" },
+    { name = "halohttp", editable = "halohttp" },
 ]
 
 [package.metadata.requires-dev]
@@ -532,6 +532,63 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
     { name = "ruff", specifier = ">=0.15.2" },
+]
+
+[[package]]
+name = "halo-sample-agent"
+version = "0.0.1"
+source = { editable = "sample-agent" }
+dependencies = [
+    { name = "agent-framework-core" },
+    { name = "halohttp" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agent-framework-core", specifier = "==1.0.0rc2" },
+    { name = "halohttp", editable = "halohttp" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+]
+
+[[package]]
+name = "halo-sample-api"
+version = "0.0.1"
+source = { editable = "sample-api" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "halohttp" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.129.0" },
+    { name = "halohttp", editable = "halohttp" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.41.0" },
+]
+
+[[package]]
+name = "halohttp"
+version = "0.0.1"
+source = { editable = "halohttp" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "fastapi" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.13.3" },
+    { name = "fastapi", specifier = ">=0.129.0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
 ]
 
 [[package]]

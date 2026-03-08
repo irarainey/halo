@@ -1,0 +1,19 @@
+[project]
+name = "halohttp"
+version = "0.0.1"
+description = "HALO — HTTP API Language for Operations. Self-describing APIs for LLM agents without MCP."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.129.0",
+    "aiohttp>=3.13.3",
+    "pydantic>=2.12.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/halohttp"]

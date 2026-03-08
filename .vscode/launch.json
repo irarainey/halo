@@ -2,22 +2,40 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Demo",
+            "name": "Sample API",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "src.main:app",
+                "sample_api.main:app",
                 "--reload",
                 "--port",
                 "3001",
                 "--env-file",
-                ".env"
+                "${workspaceFolder}/.env"
             ],
             "python": "${workspaceFolder}/.venv/bin/python",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/sample-api/src",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
+        },
+        {
+            "name": "Sample Agent",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sample_agent.main",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "cwd": "${workspaceFolder}/sample-agent/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Sample API + Agent",
+            "configurations": ["Sample API", "Sample Agent"],
+            "stopAll": true
         }
     ]
 }
