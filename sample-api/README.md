@@ -1,6 +1,9 @@
 # Sample API
 
-A FastAPI server that demonstrates HALO-compliant endpoints using the `halohttp` package. This shows how an API can describe itself to LLM agents via the `OPTIONS` verb and `application/llm+json` content type.
+A FastAPI server that demonstrates HALO-compliant endpoints across four
+domains. Each endpoint includes Pydantic models with `json_schema_extra`
+metadata so LLM agents can discover capabilities via the `OPTIONS` verb and
+`application/llm+json` content type.
 
 ## Running
 
@@ -25,12 +28,37 @@ Settings are managed via Pydantic Settings with the `SAMPLE_API_` env prefix:
 
 ## Endpoints
 
-| Method | Path | Description | Tags |
-|---|---|---|---|
-| POST | `/api/greet` | Generate a greeting | `greetings`, `read` |
-| POST | `/api/echo` | Echo text back | `debug`, `read` |
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/weather` | Return current weather conditions and forecast for a city |
+| POST | `/api/books/search` | Search the book catalogue by title or author with optional genre filter |
+| POST | `/api/inventory` | Check stock levels with optional category and low-stock filters |
+| POST | `/api/employees` | Look up employees by department and office |
 
-Both endpoints require Bearer token authentication.
+All endpoints require Bearer token authentication.
+
+## Project Structure
+
+```text
+sample-api/
+├── data/                  # JSON data files
+│   ├── books.json
+│   ├── employees.json
+│   ├── inventory.json
+│   └── weather.json
+└── src/sample_api/
+    ├── main.py            # FastAPI app and route definitions
+    ├── settings.py        # Pydantic Settings configuration
+    ├── data/
+    │   ├── __init__.py    # Re-exports loader functions
+    │   └── loader.py      # JSON data loader
+    └── models/
+        ├── __init__.py    # Re-exports all model classes
+        ├── books.py       # BookSearchRequest, BookResult, BookSearchResponse
+        ├── employees.py   # EmployeeLookupRequest, Employee, EmployeeLookupResponse
+        ├── inventory.py   # InventoryRequest, InventoryItem, InventoryResponse
+        └── weather.py     # WeatherRequest, WeatherResponse
+```
 
 ## Licence
 

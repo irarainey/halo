@@ -1,0 +1,56 @@
+[
+    {
+        "city": "London",
+        "country": "GB",
+        "temperature_c": 12.5,
+        "humidity_pct": 78,
+        "wind_kph": 22.0,
+        "condition": "overcast",
+        "forecast": "Cloud cover persisting through the afternoon with a chance of light rain by evening."
+    },
+    {
+        "city": "New York",
+        "country": "US",
+        "temperature_c": 8.0,
+        "humidity_pct": 55,
+        "wind_kph": 15.0,
+        "condition": "partly_cloudy",
+        "forecast": "Partly cloudy skies clearing toward sunset. Cool and breezy overnight."
+    },
+    {
+        "city": "Tokyo",
+        "country": "JP",
+        "temperature_c": 18.3,
+        "humidity_pct": 62,
+        "wind_kph": 10.0,
+        "condition": "sunny",
+        "forecast": "Clear skies throughout the day with mild temperatures. Pleasant conditions expected."
+    },
+    {
+        "city": "Sydney",
+        "country": "AU",
+        "temperature_c": 26.0,
+        "humidity_pct": 70,
+        "wind_kph": 18.5,
+        "condition": "sunny",
+        "forecast": "Warm and sunny with sea breezes developing in the late afternoon."
+    },
+    {
+        "city": "Berlin",
+        "country": "DE",
+        "temperature_c": 5.2,
+        "humidity_pct": 85,
+        "wind_kph": 30.0,
+        "condition": "rain",
+        "forecast": "Persistent rain throughout the day with gusty winds. Temperatures dropping overnight."
+    },
+    {
+        "city": "Mumbai",
+        "country": "IN",
+        "temperature_c": 32.0,
+        "humidity_pct": 80,
+        "wind_kph": 8.0,
+        "condition": "humid",
+        "forecast": "Hot and humid with hazy sunshine. Slight chance of isolated thunderstorms in the evening."
+    }
+]

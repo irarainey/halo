@@ -42,19 +42,19 @@ sequence = ["lint:ruff", "lint:mypy"]
 [tool.poe.tasks."lint:ruff"]
 help = "Run ruff linter and formatter check"
 sequence = [
-    { cmd = "ruff check halohttp/ sample-api/ sample-agent/ tests/" },
-    { cmd = "ruff format --check halohttp/ sample-api/ sample-agent/ tests/" },
+    { cmd = "ruff check halohttp/ sample-api/ sample-agent/" },
+    { cmd = "ruff format --check halohttp/ sample-api/ sample-agent/" },
 ]
 
 [tool.poe.tasks."lint:mypy"]
 help = "Run mypy type checking"
-cmd = "mypy halohttp/ sample-api/ sample-agent/ tests/"
+cmd = "mypy halohttp/ sample-api/ sample-agent/"
 
 [tool.poe.tasks.format]
 help = "Auto-fix ruff lint issues and format code"
 sequence = [
-    { cmd = "ruff check --fix halohttp/ sample-api/ sample-agent/ tests/" },
-    { cmd = "ruff format halohttp/ sample-api/ sample-agent/ tests/" },
+    { cmd = "ruff check --fix halohttp/ sample-api/ sample-agent/" },
+    { cmd = "ruff format halohttp/ sample-api/ sample-agent/" },
 ]
 
 [tool.poe.tasks.test]
@@ -66,7 +66,7 @@ cmd = "pytest tests/ -v"
 [tool.ruff]
 target-version = "py313"
 line-length = 140
-src = ["halohttp/src", "sample-api/src", "sample-agent/src", "tests"]
+src = ["halohttp/src", "sample-api/src", "sample-agent/src"]
 
 [tool.ruff.lint]
 select = [
@@ -98,7 +98,7 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.13"
 mypy_path = ["halohttp/src", "sample-api/src", "sample-agent/src"]
-packages = ["halohttp", "sample_api", "sample_agent", "tests"]
+packages = ["halohttp", "sample_api", "sample_agent"]
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true

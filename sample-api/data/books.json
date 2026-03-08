@@ -1,0 +1,62 @@
+[
+    {
+        "isbn": "978-0-13-468599-1",
+        "title": "The Pragmatic Programmer",
+        "author": "David Thomas, Andrew Hunt",
+        "genre": "technology",
+        "year": 2019,
+        "pages": 352,
+        "rating": 4.7,
+        "summary": "A guide to software craftsmanship covering topics from personal responsibility and career development to architectural techniques for keeping code flexible and easy to adapt."
+    },
+    {
+        "isbn": "978-0-06-112008-4",
+        "title": "To Kill a Mockingbird",
+        "author": "Harper Lee",
+        "genre": "fiction",
+        "year": 1960,
+        "pages": 281,
+        "rating": 4.8,
+        "summary": "A novel set in the American South during the 1930s, exploring themes of racial injustice and moral growth through the eyes of young Scout Finch."
+    },
+    {
+        "isbn": "978-0-14-028329-7",
+        "title": "1984",
+        "author": "George Orwell",
+        "genre": "fiction",
+        "year": 1949,
+        "pages": 328,
+        "rating": 4.7,
+        "summary": "A dystopian novel depicting a totalitarian society under constant surveillance, where independent thinking is persecuted as thoughtcrime."
+    },
+    {
+        "isbn": "978-0-596-51774-8",
+        "title": "JavaScript: The Good Parts",
+        "author": "Douglas Crockford",
+        "genre": "technology",
+        "year": 2008,
+        "pages": 176,
+        "rating": 4.2,
+        "summary": "A concise exploration of the most reliable and useful parts of JavaScript, filtering out the features that are less well thought out."
+    },
+    {
+        "isbn": "978-0-7432-7356-5",
+        "title": "Sapiens: A Brief History of Humankind",
+        "author": "Yuval Noah Harari",
+        "genre": "non-fiction",
+        "year": 2011,
+        "pages": 443,
+        "rating": 4.4,
+        "summary": "A sweeping narrative of human history from the Stone Age to the present, examining how biology and history have defined what it means to be human."
+    },
+    {
+        "isbn": "978-0-321-12521-7",
+        "title": "Domain-Driven Design",
+        "author": "Eric Evans",
+        "genre": "technology",
+        "year": 2003,
+        "pages": 560,
+        "rating": 4.3,
+        "summary": "A framework for making design decisions and a vocabulary for discussing design in the context of complex software systems aligned with business domains."
+    }
+]

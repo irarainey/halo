@@ -1,0 +1,65 @@
+[
+    {
+        "sku": "WH-1001",
+        "name": "Wireless Headphones",
+        "category": "electronics",
+        "price_gbp": 79.99,
+        "stock": 234,
+        "warehouse": "London",
+        "reorder_threshold": 50
+    },
+    {
+        "sku": "KB-2045",
+        "name": "Mechanical Keyboard",
+        "category": "electronics",
+        "price_gbp": 129.99,
+        "stock": 87,
+        "warehouse": "London",
+        "reorder_threshold": 20
+    },
+    {
+        "sku": "CH-3010",
+        "name": "Ergonomic Office Chair",
+        "category": "furniture",
+        "price_gbp": 349.00,
+        "stock": 12,
+        "warehouse": "Manchester",
+        "reorder_threshold": 5
+    },
+    {
+        "sku": "MN-4022",
+        "name": "27-inch Monitor",
+        "category": "electronics",
+        "price_gbp": 299.99,
+        "stock": 0,
+        "warehouse": "Manchester",
+        "reorder_threshold": 10
+    },
+    {
+        "sku": "DS-5005",
+        "name": "Standing Desk",
+        "category": "furniture",
+        "price_gbp": 549.00,
+        "stock": 45,
+        "warehouse": "London",
+        "reorder_threshold": 10
+    },
+    {
+        "sku": "NB-6001",
+        "name": "Notebook A5 Pack (3)",
+        "category": "stationery",
+        "price_gbp": 12.99,
+        "stock": 520,
+        "warehouse": "London",
+        "reorder_threshold": 100
+    },
+    {
+        "sku": "WC-7003",
+        "name": "HD Webcam",
+        "category": "electronics",
+        "price_gbp": 59.99,
+        "stock": 3,
+        "warehouse": "Manchester",
+        "reorder_threshold": 15
+    }
+]
