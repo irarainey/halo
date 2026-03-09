@@ -9,7 +9,7 @@ This repository contains:
 - **HALO Protocol Specification** — the full language and platform agnostic protocol spec ([halo-specification.md](halo-specification.md))
 - **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`) and an agent-side client (`HaloClient`) with discovery, schema caching, credential injection, and retry
 - **Sample API** — a FastAPI server implementing HALO-compliant endpoints across four domains
-- **Sample Agents** — LLM agent applications consuming the sample API via HALO, with examples for different agent frameworks
+- **Sample Agent** — an LLM agent application consuming the sample API via HALO using Microsoft Agent Framework
 
 ## How It Works
 

@@ -74,7 +74,7 @@ adapter = HaloAgentFrameworkAdapter(plugin)
 tools = await adapter.create_tools()  # list[FunctionTool]
 ```
 
-`create_tools()` builds `FunctionTool` instances from the discovery manifest alone — no per-tool schema requests are made. Full schemas are fetched lazily the first time each tool is invoked and cached by `HaloClient` for subsequent calls, consistent with HALO's two-phase lazy loading model (§ 3.5).
+`create_tools()` fetches the full schema for each discovered tool via `HaloClient.get_tool()` and builds a `FunctionTool` from the result. Schemas are cached by `HaloClient` so subsequent invocations do not repeat the OPTIONS requests.
 
 ## Licence
 

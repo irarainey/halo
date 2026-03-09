@@ -18,9 +18,9 @@ Ensure the sample API is running first, then from the repository root:
 python -m sample_agent_framework.main
 ```
 
-Or use the **Sample Agent** launch profile in VS Code. The **Sample API + Agent** compound profile launches both together.
+Or use the **Agent Framework** launch profile in VS Code. The **Sample API + Agent Framework** compound profile launches both together.
 
-The DevUI is available at `http://localhost:8080` once the agent starts.
+The DevUI is available at `http://localhost:8080` once the agent starts. If the sample API is not reachable, the DevUI will still start but without any tools registered.
 
 ## Configuration
 

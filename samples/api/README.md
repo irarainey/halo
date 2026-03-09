@@ -10,7 +10,7 @@ metadata so LLM agents can discover capabilities via the `OPTIONS` verb and
 From the repository root:
 
 ```bash
-uvicorn sample_api.main:app --reload --port 3001 --app-dir sample-api/src
+uvicorn sample_api.main:app --reload --port 3001 --app-dir samples/api/src
 ```
 
 Or use the **Sample API** launch profile in VS Code.
@@ -41,7 +41,7 @@ All endpoints require Bearer token authentication.
 ## Project Structure
 
 ```text
-sample-api/
+samples/api/
 ├── data/                  # JSON data files
 │   ├── books.json
 │   ├── employees.json
