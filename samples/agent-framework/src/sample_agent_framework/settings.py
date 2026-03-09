@@ -14,6 +14,7 @@ class Settings(pydantic_settings.BaseSettings):
     azure_openai_api_key: str = ""
     azure_openai_deployment: str = ""
     openai_api_version: str = "2024-12-01-preview"
+    halo_tags: str = "weather,books"
     log_level: str = "INFO"
 
     model_config = pydantic_settings.SettingsConfigDict(

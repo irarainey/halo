@@ -10,6 +10,10 @@ The agent runs inside an Agent Framework DevUI server, providing a browser-based
 
 Discovers every tool exposed by the sample API and makes them all available to the LLM. Uses Azure OpenAI as the chat backend.
 
+### halo-filter-tools
+
+Discovers only the tools matching the tags configured in `HALO_TAGS` and exposes those to the LLM. This reduces the number of tools in the LLM context, improving token efficiency and agent focus. Uses Azure OpenAI as the chat backend.
+
 ## Running
 
 Ensure the sample API is running first, then from the repository root:
@@ -35,6 +39,7 @@ Settings are managed via Pydantic Settings. The `.env` file in the repository ro
 | `AZURE_OPENAI_API_KEY` | *(required)* | Azure OpenAI API key |
 | `AZURE_OPENAI_DEPLOYMENT` | *(required)* | Azure OpenAI model deployment name |
 | `OPENAI_API_VERSION` | `2024-12-01-preview` | Azure OpenAI API version |
+| `HALO_TAGS` | `weather,books` | Comma-separated tags for the filter-tools agent |
 
 ## Thread Persistence
 
@@ -49,7 +54,8 @@ samples/agent-framework/
     ├── settings.py        # Pydantic Settings configuration
     ├── store.py           # FileBackedConversationStore
     ├── agents/
-    │   └── halo_all_tools.py  # Agent builder — discovers tools and creates the agent
+    │   ├── halo_all_tools.py    # All-tools agent — discovers every tool
+    │   └── halo_filter_tools.py # Filter-tools agent — discovers tools by tag
     └── utils/
         ├── __init__.py
         └── logger.py      # Coloured console log formatter

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""HALO all-tools agent — discovers every tool from the sample API."""
+"""HALO filter-tools agent — discovers tools filtered by tag."""
 
 from __future__ import annotations
 
@@ -12,28 +12,35 @@ from sample_agent_framework import settings as settings_mod
 from sample_agent_framework.utils import logger
 
 SYSTEM_PROMPT = (
-    "You are a helpful assistant with access to a set of API tools. "
-    "Use the tools to answer the user's questions. "
+    "You are a helpful assistant with access to a filtered set of API tools. "
+    "Use only the tools available to you to answer the user's questions. "
     "Always cite which tool you used when presenting results."
 )
 
 
-async def build() -> agent_framework.Agent:
-    """Discover HALO tools and build the all-tools agent."""
+async def build(tags: list[str]) -> agent_framework.Agent:
+    """Discover HALO tools filtered by tag and build the agent.
+
+    Args:
+        tags: Tags to filter discovered tools by.
+    """
     settings = settings_mod.Settings()
     log = logger.create_logger("Agent")
 
-    # 1. Discover HALO tools from the sample API.
+    # 1. Discover HALO tools filtered by the requested tags.
     client = halo_fastapi.HaloClient(
         base_url=settings.api_base_url,
         bearer_token=settings.api_token,
     )
-    await client.discover()
+    await client.discover(tags=tags)
 
     # 2. Convert HALO schemas to Agent Framework FunctionTools.
     adapter = halo_fastapi.HaloAgentFrameworkAdapter(client)
     halo_tools = await adapter.create_tools()
-    log.success("HALO tools loaded", {"count": len(halo_tools)})
+    log.success(
+        "HALO tools loaded (filtered)",
+        {"count": len(halo_tools), "tags": tags},
+    )
 
     # Close the discovery session — tools will create a fresh session
     # in uvicorn's event loop when invoked at runtime.
@@ -48,7 +55,7 @@ async def build() -> agent_framework.Agent:
     )
     return agent_framework.Agent(
         client=llm_client,
-        name="halo-all-tools",
+        name="halo-filter-tools",
         instructions=SYSTEM_PROMPT,
         tools=halo_tools,
     )
