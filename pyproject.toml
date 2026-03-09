@@ -58,6 +58,10 @@ sequence = [
     { cmd = "ruff format halo-fastapi/ samples/" },
 ]
 
+[tool.poe.tasks.build]
+help = "Build the halo-fastapi package"
+cmd = "uv build --package halo-fastapi"
+
 [tool.poe.tasks.test]
 help = "Run unit tests"
 cmd = "pytest halo-fastapi/tests/ -v"
