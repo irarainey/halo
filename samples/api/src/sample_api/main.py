@@ -1,7 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
-
 import fastapi
 from fastapi import security
 
@@ -12,14 +10,14 @@ from sample_api.utils import logger
 _settings = settings.Settings()
 
 logger.configure_logging(_settings.log_level)
-_logger = logging.getLogger(__name__)
+log = logger.create_logger("Server")
 
 app = fastapi.FastAPI(title=_settings.app_title, version=_settings.app_version)
 
 # Register the HALO endpoints with FastAPI - this is the only code needed in the API
 halo_fastapi.HaloRegister(app)
 
-_logger.info("Sample API configured — %s v%s", _settings.app_title, _settings.app_version)
+log.success("Sample API configured", {"title": _settings.app_title, "version": _settings.app_version})
 
 # -- Auth dependency ----------------------------------------------------------
 

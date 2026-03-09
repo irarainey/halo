@@ -72,6 +72,20 @@ class HaloNext(pydantic.BaseModel):
     suggest: str = pydantic.Field(..., description="URL of the suggested next endpoint")
 
 
+class HaloTrust(pydantic.BaseModel):
+    """Cryptographic trust metadata."""
+
+    signed: bool = pydantic.Field(False, description="Whether the schema is cryptographically signed")
+    jwks: str | None = pydantic.Field(None, description="URL of JWKS endpoint for signature verification")
+
+
+class HaloObserve(pydantic.BaseModel):
+    """Observability configuration."""
+
+    trace_header: str | None = pydantic.Field(None, description="Header name for trace ID injection")
+    explain: bool = pydantic.Field(False, description="Whether the agent should include a call reason header for audit")
+
+
 class HaloExample(pydantic.BaseModel):
     """Concrete input/output example for the endpoint."""
 
@@ -110,6 +124,8 @@ class HaloSchema(pydantic.BaseModel):
     resilience: HaloResilience | None = None
     next: list[HaloNext] = pydantic.Field(default_factory=list)
     examples: list[HaloExample] = pydantic.Field(default_factory=list)
+    trust: HaloTrust | None = None
+    observe: HaloObserve | None = None
     status: str | None = pydantic.Field(None, description="Lifecycle: active, deprecated, sunset")
     sunset: str | None = pydantic.Field(None, description="ISO date when deprecated endpoint is removed")
     replace_with: str | None = pydantic.Field(None, description="URL of the replacement endpoint")
@@ -117,9 +133,13 @@ class HaloSchema(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(populate_by_name=True)
 
     def to_response_dict(self) -> dict[str, Any]:
-        """Serialise to a dict, stripping empty/None fields."""
+        """Serialise to a dict, stripping None and empty fields.
+
+        Preserves legitimate falsy values such as ``False`` and ``0``.
+        """
         raw = self.model_dump(by_alias=True, exclude_none=True)
-        return {k: v for k, v in raw.items() if v}
+        _empty: tuple[str, list[Any], dict[str, Any]] = ("", [], {})
+        return {k: v for k, v in raw.items() if v not in _empty}
 
 
 class HaloToolEntry(pydantic.BaseModel):

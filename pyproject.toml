@@ -8,7 +8,7 @@ requires-python = ">=3.13"
 dependencies = [
     "halo-fastapi",
     "halo-sample-api",
-    "halo-sample-agents",
+    "halo-sample-agent-framework",
 ]
 
 [dependency-groups]
@@ -24,12 +24,12 @@ dev = [
 prerelease = "allow"
 
 [tool.uv.workspace]
-members = ["halo-fastapi", "sample-api", "sample-agents"]
+members = ["halo-fastapi", "samples/*"]
 
 [tool.uv.sources]
 halo-fastapi = { workspace = true }
 halo-sample-api = { workspace = true }
-halo-sample-agents = { workspace = true }
+halo-sample-agent-framework = { workspace = true }
 
 # ── Poe tasks ───────────────────────────────────────────────────
 
@@ -42,19 +42,19 @@ sequence = ["lint:ruff", "lint:mypy"]
 [tool.poe.tasks."lint:ruff"]
 help = "Run ruff linter and formatter check"
 sequence = [
-    { cmd = "ruff check halo-fastapi/ sample-api/ sample-agents/" },
-    { cmd = "ruff format --check halo-fastapi/ sample-api/ sample-agents/" },
+    { cmd = "ruff check halo-fastapi/ samples/" },
+    { cmd = "ruff format --check halo-fastapi/ samples/" },
 ]
 
 [tool.poe.tasks."lint:mypy"]
 help = "Run mypy type checking"
-cmd = "mypy halo-fastapi/ sample-api/ sample-agents/"
+cmd = "mypy halo-fastapi/ samples/"
 
 [tool.poe.tasks.format]
 help = "Auto-fix ruff lint issues and format code"
 sequence = [
-    { cmd = "ruff check --fix halo-fastapi/ sample-api/ sample-agents/" },
-    { cmd = "ruff format halo-fastapi/ sample-api/ sample-agents/" },
+    { cmd = "ruff check --fix halo-fastapi/ samples/" },
+    { cmd = "ruff format halo-fastapi/ samples/" },
 ]
 
 [tool.poe.tasks.test]
@@ -66,7 +66,7 @@ cmd = "pytest tests/ -v"
 [tool.ruff]
 target-version = "py313"
 line-length = 140
-src = ["halo-fastapi/src", "sample-api/src", "sample-agents/src"]
+src = ["halo-fastapi/src", "samples/api/src", "samples/agent-framework/src"]
 
 [tool.ruff.lint]
 select = [
@@ -85,7 +85,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["halo_fastapi", "sample_api", "sample_agent"]
+known-first-party = ["halo_fastapi", "sample_api", "sample_agent_framework"]
 
 # ── Pytest ──────────────────────────────────────────────────────
 
@@ -97,8 +97,8 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.13"
-mypy_path = ["halo-fastapi/src", "sample-api/src", "sample-agents/src"]
-packages = ["halo_fastapi", "sample_api", "sample_agent"]
+mypy_path = ["halo-fastapi/src", "samples/api/src", "samples/agent-framework/src"]
+packages = ["halo_fastapi", "sample_api", "sample_agent_framework"]
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 warn_return_any = true

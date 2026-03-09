@@ -4,7 +4,7 @@
 
 *Self-Describing APIs for LLM Agents — Without MCP*
 
-> Specification, Implementation & Framework Integration Guide
+## Specification, Implementation & Framework Integration Guide
 
 ---
 
@@ -304,7 +304,7 @@ The LLM never handles secrets directly — it decides what to call, the runtime 
 
 Any HALO implementation — regardless of language — needs to map the protocol's schema fields to the tool primitive of the target agent framework. The core adapter logic is always the same three steps: discover via `OPTIONS /`, fetch schema via `OPTIONS /route`, invoke via the real HTTP verb. The wrapping layer is the only thing that varies per framework.
 
-> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. These examples illustrate the target integration pattern — the specific adapter classes shown (`HttpDiscoveryToolkit`, `HttpToolPlugin`, `HttpToolLoader`) are not yet implemented in `halo-fastapi`. The current reference implementation provides `HttpPlugin` with discovery, schema caching, and invocation; framework-specific tool conversion is handled in application code (see the sample agent for a working example with Microsoft Agent Framework).
+> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. `HaloAgentFrameworkAdapter` is implemented in `halo-fastapi` as an optional extra (`halo-fastapi[agent-framework]`) for Microsoft Agent Framework. The remaining adapter classes (`HaloLangChainToolkit`, `HaloToolLoader`) illustrate the target integration pattern for other frameworks but are not yet implemented.
 
 ### 5.1 Semantic Kernel
 
@@ -313,7 +313,7 @@ kernel = Kernel()
 kernel.add_service(OpenAIChatCompletion(service_id='gpt4', ai_model_id='gpt-4o'))
 
 # One line — discovers all tools, registers as native KernelFunctions
-plugin = await HttpPlugin('https://api.example.com', credentials).discover(tags=['payments'])
+plugin = await HaloClient('https://api.example.com', bearer_token=token).discover(tags=['payments'])
 kernel.add_plugin(plugin)
 
 result = await kernel.invoke_prompt('Charge customer cust_123 £25')
@@ -324,7 +324,7 @@ The plugin auto-maps OPTIONS schema fields to SK primitives: `why` becomes the f
 ### 5.2 LangChain
 
 ```python
-toolkit = HttpDiscoveryToolkit('https://api.example.com', credentials)
+toolkit = HaloLangChainToolkit('https://api.example.com', credentials)
 tools = await toolkit.get_tools(tags=['payments'])
 
 agent = create_openai_tools_agent(llm, tools, prompt)
@@ -335,39 +335,34 @@ result = await executor.ainvoke({'input': 'Charge customer £25'})
 ### 5.3 Microsoft Agent Framework
 
 ```python
-from azure.ai.projects import AIProjectClient
-from halo_fastapi import HttpToolPlugin
+from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
+import agent_framework
 
-client = AIProjectClient.from_connection_string(
-    conn_str=os.environ['PROJECT_CONNECTION_STRING'],
-    credential=DefaultAzureCredential()
-)
-
-plugin = await HttpToolPlugin(
+# 1. Discover HALO tools
+plugin = await HaloClient(
     base_url='https://api.example.com',
-    credentials=credentials,
-    tags=['payments']
-).discover()
+    bearer_token=token,
+).discover(tags=['payments'])
 
-agent = client.agents.create_agent(
-    model='gpt-4o',
+# 2. Convert to Agent Framework FunctionTools
+adapter = HaloAgentFrameworkAdapter(plugin)
+tools = await adapter.create_tools()
+
+# 3. Create and run the agent
+agent = agent_framework.Agent(
+    client=chat_client,
     name='payment-agent',
-    tools=plugin.to_azure_tools(),
-    tool_resources=plugin.to_azure_resources()
+    tools=tools,
 )
-
-thread = client.agents.create_thread()
-client.agents.create_message(thread.id, role='user', content='Charge customer cust_123 £25')
-run = client.agents.create_and_process_run(thread.id, agent.id)
 ```
 
 ### 5.4 LlamaIndex
 
 ```python
 from llama_index.core.agent import ReActAgent
-from halo_fastapi import HttpToolLoader
+from halo_fastapi import HaloToolLoader
 
-loader = HttpToolLoader(
+loader = HaloToolLoader(
     base_url='https://api.example.com',
     credentials=credentials
 )
@@ -616,9 +611,9 @@ uv add halo-fastapi
 The package exposes two primary objects:
 
 - **`HaloRegister`** — the server-side FastAPI plugin
-- **`HttpPlugin`** — the client-side agent adapter
+- **`HaloClient`** — the client-side agent adapter
 
-Together they are the complete HALO integration: `HaloRegister` makes an API HALO-compliant, `HttpPlugin` makes an agent capable of consuming any HALO-compliant API.
+Together they are the complete HALO integration: `HaloRegister` makes an API HALO-compliant, `HaloClient` makes an agent capable of consuming any HALO-compliant API.
 
 ### 11.2 The HaloRegister Plugin
 
@@ -879,18 +874,16 @@ For teams with existing OpenAPI specs, a bridge auto-generates `application/llm+
 
 ## 12. halo-fastapi: Client-Side Agent Adapter
 
-The same `halo-fastapi` package provides `HttpPlugin` — the client-side HTTP adapter that discovers any HALO-compliant API, caches schemas, injects credentials, and invokes tools directly.
+The same `halo-fastapi` package provides `HaloClient` — the client-side adapter that discovers any HALO-compliant API, caches schemas, injects credentials, and invokes tools directly.
 
-### 12.1 HttpPlugin Core
+### 12.1 HaloClient Core
 
 ```python
-from halo_fastapi import HttpPlugin
+from halo_fastapi import HaloClient
 
-plugin = HttpPlugin(
+plugin = HaloClient(
     base_url='https://api.example.com',
-    credentials={
-        'api.example.com': {'type': 'bearer', 'value': os.getenv('API_KEY')}
-    }
+    bearer_token=os.getenv('API_KEY'),
 )
 
 # Discover all tools, or filter by tag
@@ -904,9 +897,9 @@ schema = await plugin.get_tool('/api/payments/charge')
 result = await plugin.invoke('/api/payments/charge', body={'amount': 1000})
 ```
 
-### 12.2 What HttpPlugin Does Internally
+### 12.2 What HaloClient Does Internally
 
-When `discover()` is called, `HttpPlugin` performs the following sequence:
+When `discover()` is called, `HaloClient` performs the following sequence:
 
 1. Fires `OPTIONS /` with `Accept: application/llm+json` — receives the root manifest with tool URLs, names, descriptions, and tags
 2. If tags were requested, the query `?tags=tag1,tag2` is appended and server-side filtering applies
@@ -917,13 +910,20 @@ When `discover()` is called, `HttpPlugin` performs the following sequence:
 
 ### 12.3 Credential Injection
 
-`HttpPlugin` accepts a credential map keyed by domain (with optional port):
+For the common case of a single API with a bearer token, use the `bearer_token` convenience parameter:
+
+```python
+plugin = HaloClient(base_url='https://api.example.com', bearer_token=os.getenv('API_KEY'))
+```
+
+For advanced scenarios (multiple hosts, API keys, basic auth), pass a credential map keyed by domain (with optional port):
 
 ```python
 credentials = {
     'api.example.com':      {'type': 'bearer', 'value': os.getenv('API_KEY')},
     'api.internal.com:8443': {'type': 'apikey', 'header': 'X-API-Key', 'value': os.getenv('INTERNAL_KEY')},
 }
+plugin = HaloClient(base_url='https://api.example.com', credentials=credentials)
 ```
 
 Supported credential types:
@@ -936,31 +936,17 @@ Supported credential types:
 
 ### 12.4 Framework Integration
 
-`HttpPlugin` provides discovery, schema caching, and invocation. To use discovered tools with a specific agent framework, convert HALO schemas to the framework's tool primitive. The sample agent in this repository demonstrates this with Microsoft Agent Framework:
+`halo-fastapi` includes `HaloAgentFrameworkAdapter` as an optional extra for Microsoft Agent Framework. Install with `halo-fastapi[agent-framework]`:
 
 ```python
-from agent_framework import FunctionTool
-from halo_fastapi import HttpPlugin
+from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
 
-plugin = await HttpPlugin(base_url, credentials).discover()
-
-tools = []
-for entry in plugin.tools:
-    schema = await plugin.get_tool(entry.url)
-    path = entry.url
-
-    async def invoke(path=path, **kwargs):
-        return await plugin.invoke(path, body=kwargs)
-
-    tools.append(FunctionTool(
-        name=entry.name,
-        description=schema.why or schema.description,
-        func=invoke,
-        input_model=build_input_model(schema),  # convert HALO input fields to JSON Schema
-    ))
+plugin = await HaloClient(base_url, bearer_token=token).discover()
+adapter = HaloAgentFrameworkAdapter(plugin)
+tools = await adapter.create_tools()  # list[FunctionTool]
 ```
 
-The same pattern applies to any framework — Semantic Kernel, LangChain, LlamaIndex — by wrapping `plugin.invoke()` in the framework's tool primitive.
+For other frameworks — Semantic Kernel, LangChain, LlamaIndex — the same pattern applies: wrap `plugin.invoke()` in the framework's tool primitive.
 
 > **Package boundary:** `halo-fastapi` is one implementation of the HALO protocol. A developer building a Node.js agent would use a separate `halo-node` package that performs identical OPTIONS calls and maps the same schema fields to its framework primitives. The protocol is the contract. The packages are convenient implementations of that contract.
 
@@ -984,10 +970,10 @@ The same pattern applies to any framework — Semantic Kernel, LangChain, LlamaI
 
 ### Phase 3 — Framework Adapters (Month 2)
 
-1. Semantic Kernel `HttpPlugin` with lazy loading, tag filtering, and SK safety integration
-2. LangChain `HttpDiscoveryToolkit`
-3. LlamaIndex `HttpToolLoader`
-4. Microsoft Agent Framework `HttpToolPlugin` with Azure credential integration
+1. Semantic Kernel `HaloClient` with lazy loading, tag filtering, and SK safety integration
+2. LangChain `HaloLangChainToolkit`
+3. LlamaIndex `HaloToolLoader`
+4. Microsoft Agent Framework `HaloAgentFrameworkAdapter` with Azure credential integration
 5. Reference demo: multi-tool agent with zero static tool definitions
 
 ### Phase 4 — Ecosystem (Month 3+)

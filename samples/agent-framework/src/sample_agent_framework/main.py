@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import pathlib
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -12,18 +11,17 @@ from typing import Any
 import uvicorn
 from agent_framework_devui import _server
 
-from sample_agent import settings as settings_mod
-from sample_agent import store as store_mod
-from sample_agent.agents import halo_all_tools
-from sample_agent.utils import logger
+from sample_agent_framework import settings, store
+from sample_agent_framework.agents import halo_all_tools
+from sample_agent_framework.utils import logger
 
 _THREADS_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / ".threads"
 
-_log = logging.getLogger(__name__)
+log = logger.create_logger("Server")
 
 
 class _PersistingDevServer(_server.DevServer):
-    """DevServer that injects a file-backed conversation store.
+    """DevServer that persists conversation turns to disk.
 
     The canonical persist happens at the end of ``_stream_execution``
     by capturing the ``response.completed`` SSE event which contains
@@ -32,43 +30,11 @@ class _PersistingDevServer(_server.DevServer):
 
     def __init__(
         self,
-        store: store_mod.FileBackedConversationStore,
+        persistence: store.FileBackedConversationStore,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._store = store
-
-    async def _ensure_executor(
-        self,
-    ) -> _server.AgentFrameworkExecutor:
-        """Initialise executor with file-backed store."""
-        if self.executor is None:  # type: ignore[has-type]
-            entity_discovery = _server.EntityDiscovery(
-                self.entities_dir,  # type: ignore[arg-type]
-            )
-            message_mapper = _server.MessageMapper()
-            self.executor = _server.AgentFrameworkExecutor(  # type: ignore[assignment,has-type]
-                entity_discovery,
-                message_mapper,
-                conversation_store=self._store,
-            )
-            await self.executor.discover_entities()  # type: ignore[attr-defined]
-
-            if self._pending_entities:  # type: ignore[has-type]
-                discovery = self.executor.entity_discovery  # type: ignore[attr-defined]
-                for entity in self._pending_entities:  # type: ignore[has-type]
-                    info = await discovery.create_entity_info_from_object(
-                        entity,
-                        source="in_memory",
-                    )
-                    discovery.register_entity(
-                        info.id,
-                        info,
-                        entity,
-                    )
-                self._pending_entities = None
-
-        return self.executor  # type: ignore[return-value]
+        self._persistence = persistence
 
     # -- post-stream persistence ---------------------------------------------
 
@@ -98,7 +64,11 @@ class _PersistingDevServer(_server.DevServer):
             yield chunk
 
         # Persist the turn with the full response.
-        conversation_id: str | None = request._get_conversation_id()
+        try:
+            conversation_id: str | None = request._get_conversation_id()
+        except Exception:
+            return
+
         if conversation_id:
             user_input = ""
             if isinstance(request.input, str):
@@ -113,34 +83,34 @@ class _PersistingDevServer(_server.DevServer):
                     if user_input:
                         break
 
-            self._store.persist_turn(
+            self._persistence.persist_turn(
                 conversation_id,
                 user_input=user_input,
                 response=completed_response,
             )
-            _log.debug("Persisted thread %s after stream completed", conversation_id)
+            log.debug("Persisted thread", {"conversationId": conversation_id})
 
 
 def main() -> None:
     """Build agents and launch the DevUI."""
-    settings = settings_mod.Settings()
-    logger.configure_logging(settings.log_level)
-    log = logging.getLogger(__name__)
+    config = settings.Settings()
+    logger.configure_logging(config.log_level)
 
-    agent = asyncio.run(halo_all_tools.build())
+    all_tools_agent = asyncio.run(halo_all_tools.build())
 
-    store = store_mod.FileBackedConversationStore(_THREADS_DIR)
-    log.info("Persisting threads to %s", _THREADS_DIR)
+    persistence_store = store.FileBackedConversationStore(_THREADS_DIR)
+    log.info("Persisting threads", {"path": str(_THREADS_DIR)})
 
     server = _PersistingDevServer(
-        store=store,
+        persistence=persistence_store,
         port=8080,
     )
-    server._pending_entities = [agent]  # type: ignore[assignment]
+    server.register_entities([all_tools_agent])
     app = server.get_app()
 
-    log.info("Starting DevUI on port 8080")
-    uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
+    log.section("HALO Agent Framework Sample")
+    log.info("Starting DevUI", {"port": server.port})
+    uvicorn.run(app, host="127.0.0.1", port=server.port, log_level="info")
 
 
 if __name__ == "__main__":

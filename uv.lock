@@ -9,7 +9,7 @@ prerelease-mode = "allow"
 members = [
     "halo",
     "halo-fastapi",
-    "halo-sample-agents",
+    "halo-sample-agent-framework",
     "halo-sample-api",
 ]
 
@@ -520,7 +520,7 @@ version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "halo-fastapi" },
-    { name = "halo-sample-agents" },
+    { name = "halo-sample-agent-framework" },
     { name = "halo-sample-api" },
 ]
 
@@ -536,8 +536,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "halo-fastapi", editable = "halo-fastapi" },
-    { name = "halo-sample-agents", editable = "sample-agents" },
-    { name = "halo-sample-api", editable = "sample-api" },
+    { name = "halo-sample-agent-framework", editable = "samples/agent-framework" },
+    { name = "halo-sample-api", editable = "samples/api" },
 ]
 
 [package.metadata.requires-dev]
@@ -559,21 +559,28 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.optional-dependencies]
+agent-framework = [
+    { name = "agent-framework-core" },
+]
+
 [package.metadata]
 requires-dist = [
+    { name = "agent-framework-core", marker = "extra == 'agent-framework'", specifier = ">=1.0.0rc2" },
     { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "fastapi", specifier = ">=0.129.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
 ]
+provides-extras = ["agent-framework"]
 
 [[package]]
-name = "halo-sample-agents"
+name = "halo-sample-agent-framework"
 version = "0.0.1"
-source = { editable = "sample-agents" }
+source = { editable = "samples/agent-framework" }
 dependencies = [
     { name = "agent-framework-core" },
     { name = "agent-framework-devui" },
-    { name = "halo-fastapi" },
+    { name = "halo-fastapi", extra = ["agent-framework"] },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
 ]
@@ -582,7 +589,7 @@ dependencies = [
 requires-dist = [
     { name = "agent-framework-core", specifier = "==1.0.0rc2" },
     { name = "agent-framework-devui", specifier = ">=1.0.0b260225" },
-    { name = "halo-fastapi", editable = "halo-fastapi" },
+    { name = "halo-fastapi", extras = ["agent-framework"], editable = "halo-fastapi" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
 ]
@@ -590,7 +597,7 @@ requires-dist = [
 [[package]]
 name = "halo-sample-api"
 version = "0.0.1"
-source = { editable = "sample-api" }
+source = { editable = "samples/api" }
 dependencies = [
     { name = "fastapi" },
     { name = "halo-fastapi" },

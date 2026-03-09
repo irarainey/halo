@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import pathlib
+
 import pydantic_settings
+
+_ENV_FILE = pathlib.Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(pydantic_settings.BaseSettings):
@@ -10,4 +14,7 @@ class Settings(pydantic_settings.BaseSettings):
     port: int = 3001
     log_level: str = "INFO"
 
-    model_config = {"env_prefix": "SAMPLE_API_"}
+    model_config = pydantic_settings.SettingsConfigDict(
+        env_file=str(_ENV_FILE),
+        extra="ignore",
+    )

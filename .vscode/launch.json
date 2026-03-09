@@ -15,17 +15,17 @@
                 "${workspaceFolder}/.env"
             ],
             "python": "${workspaceFolder}/.venv/bin/python",
-            "cwd": "${workspaceFolder}/sample-api/src",
+            "cwd": "${workspaceFolder}/samples/api/src",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
         },
         {
-            "name": "Sample Agent",
+            "name": "Agent Framework",
             "type": "debugpy",
             "request": "launch",
-            "module": "sample_agent.main",
+            "module": "sample_agent_framework.main",
             "python": "${workspaceFolder}/.venv/bin/python",
-            "cwd": "${workspaceFolder}/sample-agents/src",
+            "cwd": "${workspaceFolder}/samples/agent-framework/src",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "envFile": "${workspaceFolder}/.env",
@@ -34,8 +34,8 @@
     ],
     "compounds": [
         {
-            "name": "Sample API + Agent",
-            "configurations": ["Sample API", "Sample Agent"],
+            "name": "Sample API + Agent Framework",
+            "configurations": ["Sample API", "Agent Framework"],
             "stopAll": true
         }
     ]

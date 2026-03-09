@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""HttpPlugin — client-side agent adapter for the HALO protocol.
+"""HaloClient — client-side adapter for the HALO protocol.
 
-Discovers HALO-compliant APIs via ``OPTIONS`` requests and provides
-framework adapters for Semantic Kernel, LangChain, LlamaIndex, and
-Microsoft Agent Framework.
+Discovers HALO-compliant APIs via ``OPTIONS`` requests, caches schemas,
+injects credentials, and invokes tools directly.
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ import aiohttp
 
 from halo_fastapi import _constants, _types
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_RETRIES = 5
 _DEFAULT_BASE_DELAY = 0.5
@@ -48,7 +47,7 @@ async def _request_with_retry(
                     if attempt == max_retries:
                         resp.raise_for_status()
                     delay = min(base_delay * (2**attempt), max_delay)
-                    logger.warning(
+                    _logger.warning(
                         "Request to %s returned %s, retrying in %.1fs (attempt %d/%d)",
                         url,
                         resp.status,
@@ -66,7 +65,7 @@ async def _request_with_retry(
             if attempt == max_retries:
                 raise
             delay = min(base_delay * (2**attempt), max_delay)
-            logger.warning(
+            _logger.warning(
                 "Connection to %s failed (%s), retrying in %.1fs (attempt %d/%d)",
                 url,
                 exc,
@@ -80,23 +79,17 @@ async def _request_with_retry(
     raise aiohttp.ClientError(msg) from last_exc
 
 
-class HttpPlugin:
+class HaloClient:
     """Client-side adapter that discovers and consumes HALO APIs.
 
     Usage::
 
-        from halo_fastapi import HttpPlugin
+        from halo_fastapi import HaloClient
 
-        plugin = HttpPlugin(
+        client = await HaloClient(
             base_url="https://api.example.com",
-            credentials={
-                "api.example.com": {
-                    "type": "bearer",
-                    "value": "my-token",
-                }
-            },
-        )
-        await plugin.discover(tags=["payments"])
+            bearer_token="my-token",
+        ).discover(tags=["payments"])
 
         # Access the full manifest
         plugin.manifest
@@ -113,18 +106,43 @@ class HttpPlugin:
         base_url: str,
         credentials: dict[str, dict[str, str]] | None = None,
         *,
+        bearer_token: str | None = None,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         base_delay: float = _DEFAULT_BASE_DELAY,
         max_delay: float = _DEFAULT_MAX_DELAY,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._credentials = credentials or {}
+        if bearer_token:
+            parsed = parse.urlparse(self._base_url)
+            hostname = parsed.hostname or ""
+            domain = f"{hostname}:{parsed.port}" if parsed.port else hostname
+            self._credentials[domain] = {"type": "bearer", "value": bearer_token}
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._manifest: _types.HaloManifest | None = None
         self._schemas: dict[str, _types.HaloSchema] = {}
         self._tools: list[_types.HaloToolEntry] = []
+        self._session: aiohttp.ClientSession | None = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Return the shared session, creating one lazily if needed."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self) -> None:
+        """Close the underlying HTTP session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+    async def __aenter__(self) -> HaloClient:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> None:
+        await self.close()
 
     @property
     def manifest(self) -> _types.HaloManifest | None:
@@ -144,7 +162,7 @@ class HttpPlugin:
     async def discover(
         self,
         tags: list[str] | None = None,
-    ) -> HttpPlugin:
+    ) -> HaloClient:
         """Perform root discovery via ``OPTIONS /``.
 
         Args:
@@ -158,20 +176,20 @@ class HttpPlugin:
             url += "?tags=" + ",".join(tags)
 
         headers = self._build_headers()
-        async with aiohttp.ClientSession() as session:
-            data = await _request_with_retry(
-                session,
-                "OPTIONS",
-                url,
-                headers=headers,
-                max_retries=self._max_retries,
-                base_delay=self._base_delay,
-                max_delay=self._max_delay,
-            )
+        session = await self._get_session()
+        data = await _request_with_retry(
+            session,
+            "OPTIONS",
+            url,
+            headers=headers,
+            max_retries=self._max_retries,
+            base_delay=self._base_delay,
+            max_delay=self._max_delay,
+        )
 
         self._manifest = _types.HaloManifest(**data)
         self._tools = list(self._manifest.tools)
-        logger.info(
+        _logger.info(
             "Discovered %d tool(s) from %s",
             len(self._tools),
             self._base_url,
@@ -195,20 +213,20 @@ class HttpPlugin:
 
         url = self._base_url + path
         headers = self._build_headers()
-        async with aiohttp.ClientSession() as session:
-            data = await _request_with_retry(
-                session,
-                "OPTIONS",
-                url,
-                headers=headers,
-                max_retries=self._max_retries,
-                base_delay=self._base_delay,
-                max_delay=self._max_delay,
-            )
+        session = await self._get_session()
+        data = await _request_with_retry(
+            session,
+            "OPTIONS",
+            url,
+            headers=headers,
+            max_retries=self._max_retries,
+            base_delay=self._base_delay,
+            max_delay=self._max_delay,
+        )
 
         schema = _types.HaloSchema(**data)
         self._schemas[path] = schema
-        logger.debug("Fetched schema for %s", path)
+        _logger.debug("Fetched schema for %s", path)
         return schema
 
     async def invoke(
@@ -232,19 +250,19 @@ class HttpPlugin:
         url = self._base_url + schema.call.url
         method = schema.call.method.upper()
         headers = self._build_headers(include_accept_halo=False)
-        logger.debug("Invoking %s %s", method, url)
+        _logger.debug("Invoking %s %s", method, url)
 
-        async with aiohttp.ClientSession() as session:
-            return await _request_with_retry(
-                session,
-                method,
-                url,
-                headers=headers,
-                json=body,
-                max_retries=self._max_retries,
-                base_delay=self._base_delay,
-                max_delay=self._max_delay,
-            )
+        session = await self._get_session()
+        return await _request_with_retry(
+            session,
+            method,
+            url,
+            headers=headers,
+            json=body,
+            max_retries=self._max_retries,
+            base_delay=self._base_delay,
+            max_delay=self._max_delay,
+        )
 
     def _build_headers(self, include_accept_halo: bool = True) -> dict[str, str]:
         """Build request headers with credentials and Accept type."""

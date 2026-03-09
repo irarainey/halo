@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
-import pydantic
+import pathlib
+
 import pydantic_settings
+
+_ENV_FILE = pathlib.Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(pydantic_settings.BaseSettings):
@@ -11,12 +14,9 @@ class Settings(pydantic_settings.BaseSettings):
     azure_openai_api_key: str = ""
     azure_openai_deployment: str = ""
     openai_api_version: str = "2024-12-01-preview"
-    log_level: str = pydantic.Field(
-        default="INFO",
-        validation_alias="SAMPLE_AGENT_LOG_LEVEL",
-    )
+    log_level: str = "INFO"
 
     model_config = pydantic_settings.SettingsConfigDict(
-        env_file=".env",
-        populate_by_name=True,
+        env_file=str(_ENV_FILE),
+        extra="ignore",
     )

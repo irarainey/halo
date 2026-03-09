@@ -6,7 +6,7 @@ The Python reference implementation of the [HALO protocol](../halo-specification
 
 **Server-side (`HaloRegister`)** — A single line added to any FastAPI application makes every route HALO-compliant. The plugin introspects existing routes, Pydantic models, and dependency injection at startup to automatically generate `application/llm+json` schemas served via `OPTIONS` handlers.
 
-**Client-side (`HttpPlugin`)** — An HTTP client that discovers and consumes any HALO-compliant API. Handles root manifest discovery, per-route schema fetching with caching, credential injection (bearer, API key, basic), and retry with exponential backoff.
+**Client-side (`HaloClient`)** — A client that discovers and consumes any HALO-compliant API. Handles root manifest discovery, per-route schema fetching with caching, credential injection (bearer, API key, basic), and retry with exponential backoff.
 
 ## Installation
 
@@ -40,11 +40,11 @@ Everything is derived automatically from your existing route definitions, Pydant
 ## Client Usage
 
 ```python
-from halo_fastapi import HttpPlugin
+from halo_fastapi import HaloClient
 
-plugin = await HttpPlugin(
+plugin = await HaloClient(
     base_url="https://api.example.com",
-    credentials={"api.example.com": {"type": "bearer", "value": os.getenv("API_KEY")}}
+    bearer_token=os.getenv("API_KEY"),
 ).discover(tags=["payments"])
 
 # Fetch a single tool schema (cached after first call)
@@ -56,7 +56,25 @@ result = await plugin.invoke("/api/payments/charge", body={"amount": 1000})
 
 ### Retry Behaviour
 
-`HttpPlugin` retries failed requests with exponential backoff on connection errors, HTTP 429, and 5xx responses. Defaults: 5 retries, 0.5s base delay, 30s max delay — configurable via constructor parameters.
+`HaloClient` retries failed requests with exponential backoff on connection errors, HTTP 429, and 5xx responses. Defaults: 5 retries, 0.5s base delay, 30s max delay — configurable via constructor parameters.
+
+## Agent Framework Integration (Optional)
+
+`HaloAgentFrameworkAdapter` converts discovered HALO tools into Microsoft Agent Framework `FunctionTool` instances. Install with the optional extra:
+
+```bash
+uv add "halo-fastapi[agent-framework]"
+```
+
+```python
+from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
+
+plugin = await HaloClient(base_url="https://api.example.com").discover()
+adapter = HaloAgentFrameworkAdapter(plugin)
+tools = await adapter.create_tools()  # list[FunctionTool]
+```
+
+`create_tools()` builds `FunctionTool` instances from the discovery manifest alone — no per-tool schema requests are made. Full schemas are fetched lazily the first time each tool is invoked and cached by `HaloClient` for subsequent calls, consistent with HALO's two-phase lazy loading model (§ 3.5).
 
 ## Licence
 

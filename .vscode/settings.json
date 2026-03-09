@@ -3,7 +3,7 @@
     "python.analysis.diagnosticSeverityOverrides": {},
     "python.analysis.extraPaths": [
         "halo-fastapi/src",
-        "sample-api/src",
-        "sample-agents/src"
+        "samples/api/src",
+        "samples/agent-framework/src"
     ]
 }

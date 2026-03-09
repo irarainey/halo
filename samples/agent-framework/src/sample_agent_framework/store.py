@@ -11,7 +11,7 @@ from typing import Any
 
 from agent_framework_devui import _conversations
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class FileBackedConversationStore(_conversations.InMemoryConversationStore):
@@ -61,7 +61,7 @@ class FileBackedConversationStore(_conversations.InMemoryConversationStore):
                 "turns": [],
             },
         )
-        logger.debug("Created conversation %s", conv.id)
+        _logger.debug("Created conversation %s", conv.id)
         return conv
 
     def delete_conversation(
@@ -72,7 +72,7 @@ class FileBackedConversationStore(_conversations.InMemoryConversationStore):
         result = super().delete_conversation(conversation_id)
         path = self._storage_dir / f"{conversation_id}.json"
         path.unlink(missing_ok=True)
-        logger.debug("Deleted conversation %s", conversation_id)
+        _logger.debug("Deleted conversation %s", conversation_id)
         return result
 
     # -- serialisation -------------------------------------------------------
@@ -111,7 +111,7 @@ class FileBackedConversationStore(_conversations.InMemoryConversationStore):
             }
         )
         self._write(conversation_id, thread)
-        logger.debug(
+        _logger.debug(
             "Persisted turn %d for conversation %s",
             len(thread["turns"]),
             conversation_id,

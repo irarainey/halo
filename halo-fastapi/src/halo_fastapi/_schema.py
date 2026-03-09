@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from collections.abc import Callable, Coroutine
 from typing import Any, get_type_hints
 
 import fastapi
@@ -20,7 +21,7 @@ from starlette import requests, responses
 
 from halo_fastapi import _constants, _types
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def _detect_auth(dependant: Any) -> _types.HaloAuth:
@@ -85,13 +86,12 @@ def _extract_input_fields(
         # envelope.  Resolve it so ``type`` and ``enum`` are visible.
         resolved = _resolve_any_of(prop) if "anyOf" in prop else prop
 
-        entry: dict[str, Any] = {}
-        if "type" in resolved:
-            entry["type"] = resolved["type"]
+        # Start with all JSON Schema properties from the resolved
+        # branch (preserves constraints like minimum, maxLength, etc.)
+        entry: dict[str, Any] = dict(resolved)
+        # Description lives on the original prop, not the anyOf branch.
         if "description" in prop:
             entry["description"] = prop["description"]
-        if "enum" in resolved:
-            entry["enum"] = resolved["enum"]
         if name in required:
             entry["required"] = True
         fields[name] = entry
@@ -139,6 +139,14 @@ def _build_schema(
     resilience_raw = llm_extra.get("resilience")
     resilience = _types.HaloResilience(**resilience_raw) if resilience_raw else None
 
+    # Build trust.
+    trust_raw = llm_extra.get("trust")
+    trust = _types.HaloTrust(**trust_raw) if trust_raw else None
+
+    # Build observe.
+    observe_raw = llm_extra.get("observe")
+    observe = _types.HaloObserve(**observe_raw) if observe_raw else None
+
     # Build next steps.
     next_steps = [_types.HaloNext(**n) for n in llm_extra.get("next", [])]
 
@@ -158,6 +166,8 @@ def _build_schema(
         effects=effects,
         limits=limits,
         resilience=resilience,
+        trust=trust,
+        observe=observe,
         next=next_steps,
         examples=examples,
         status=llm_extra.get("status"),
@@ -182,16 +192,22 @@ class HaloRegister:
     ``OPTIONS`` handlers that serve ``application/llm+json`` responses.
     """
 
-    def __init__(self, app: fastapi.FastAPI) -> None:
+    def __init__(
+        self,
+        app: fastapi.FastAPI,
+        *,
+        tool_filter: Callable[[requests.Request, str], bool] | None = None,
+    ) -> None:
         self._app = app
         self._schemas: dict[str, _types.HaloSchema] = {}
+        self._endpoint_names: dict[str, str] = {}
+        self._tool_filter = tool_filter
 
-        # Use a startup event to ensure all routes are registered
-        # before we introspect them.
-        @app.on_event("startup")
-        async def _register_halo_handlers() -> None:
+        async def _register() -> None:
             self._introspect()
             self._register_handlers()
+
+        app.router.on_startup.append(_register)
 
     def _introspect(self) -> None:
         """Walk the route table and build HALO schemas."""
@@ -205,14 +221,24 @@ class HaloRegister:
 
             schema = _build_schema(route, auth)
             self._schemas[route.path] = schema
-            logger.debug("Registered HALO schema for %s", route.path)
+            self._endpoint_names[route.path] = route.endpoint.__name__
+            _logger.debug("Registered HALO schema for %s", route.path)
 
-        logger.info("HALO introspection complete — %d endpoint(s)", len(self._schemas))
+        _logger.info("HALO introspection complete — %d endpoint(s)", len(self._schemas))
 
     def _register_handlers(self) -> None:
-        """Register OPTIONS handlers for each route and the root."""
+        """Register OPTIONS handlers for each route and the root.
+
+        If an OPTIONS handler already exists on a given path, the
+        existing handler is preserved and called for non-HALO requests
+        (i.e. when ``Accept`` is not ``application/llm+json``).
+        """
         app = self._app
         schemas = self._schemas
+        endpoint_names = self._endpoint_names
+        tool_filter = self._tool_filter
+
+        existing_root = self._pop_options_route("/")
 
         # Root manifest handler.
         @app.options("/")
@@ -221,6 +247,8 @@ class HaloRegister:
             tags: str | None = None,
         ) -> responses.Response:
             if request.headers.get("accept") != _constants.CONTENT_TYPE:
+                if existing_root is not None:
+                    return await existing_root(request)
                 return responses.Response(status_code=204)
 
             tools = []
@@ -228,10 +256,12 @@ class HaloRegister:
             for path, schema in schemas.items():
                 if requested_tags and not (requested_tags & set(schema.tags)):
                     continue
+                if tool_filter and not tool_filter(request, path):
+                    continue
                 tools.append(
                     _types.HaloToolEntry(
                         url=path,
-                        name=schema.call.url.strip("/").split("/")[-1],
+                        name=endpoint_names.get(path, path.strip("/").split("/")[-1]),
                         description=schema.description,
                         tags=schema.tags,
                     )
@@ -251,15 +281,36 @@ class HaloRegister:
         for path, schema in schemas.items():
             self._add_route_handler(path, schema)
 
+    def _pop_options_route(
+        self,
+        path: str,
+    ) -> Callable[..., Coroutine[Any, Any, responses.Response]] | None:
+        """Remove and return an existing OPTIONS handler for *path*.
+
+        Walks ``app.routes`` and removes the first ``APIRoute`` whose
+        path matches and whose methods include ``OPTIONS``.  Returns
+        the endpoint callable, or ``None`` if no match is found.
+        """
+        for i, route in enumerate(self._app.routes):
+            if isinstance(route, routing.APIRoute) and route.path == path and "OPTIONS" in (route.methods or set()):
+                self._app.routes.pop(i)
+                _logger.debug("Wrapped existing OPTIONS handler for %s", path)
+                return route.endpoint  # type: ignore[return-value]
+        return None
+
     def _add_route_handler(self, path: str, schema: _types.HaloSchema) -> None:
         """Register an OPTIONS handler for a single route."""
         response_dict = schema.to_response_dict()
+        existing = self._pop_options_route(path)
 
         @self._app.options(path)
         async def _halo_route_options(
             request: requests.Request,
             _response: dict[str, Any] = response_dict,
+            _existing: Callable[..., Coroutine[Any, Any, responses.Response]] | None = existing,
         ) -> responses.Response:
             if request.headers.get("accept") != _constants.CONTENT_TYPE:
+                if _existing is not None:
+                    return await _existing(request)
                 return responses.Response(status_code=204)
             return responses.JSONResponse(content=_response, media_type=_constants.CONTENT_TYPE)

@@ -7,9 +7,9 @@ HALO is a lightweight protocol convention that lets any HTTP API describe itself
 This repository contains:
 
 - **HALO Protocol Specification** — the full language and platform agnostic protocol spec ([halo-specification.md](halo-specification.md))
-- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`) and an agent-side HTTP client (`HttpPlugin`) with discovery, schema caching, credential injection, and retry
+- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`) and an agent-side client (`HaloClient`) with discovery, schema caching, credential injection, and retry
 - **Sample API** — a FastAPI server implementing HALO-compliant endpoints across four domains
-- **Sample Agents** — an LLM agent application using Microsoft Agent Framework and DevUI to consume the sample API via HALO
+- **Sample Agents** — LLM agent applications consuming the sample API via HALO, with examples for different agent frameworks
 
 ## How It Works
 
@@ -47,8 +47,8 @@ An LLM agent sends `OPTIONS` with `Accept: application/llm+json` to any endpoint
 - **Auth-aware scoping** — pass a token with `OPTIONS /` and the manifest reflects only what those credentials permit.
 - **Lazy loading** — full schemas are fetched only when the agent selects a tool, keeping token costs low.
 - **Direct call path** — no proxy layer. Agent calls the API directly. Two hops: agent → API.
-- **Credential injection** — `HttpPlugin` injects bearer tokens, API keys, or basic auth from a credential map at call time.
-- **Retry with backoff** — `HttpPlugin` retries failed requests with exponential backoff on 429 and 5xx responses.
+- **Credential injection** — `HaloClient` injects bearer tokens, API keys, or basic auth from a credential map at call time.
+- **Retry with backoff** — `HaloClient` retries failed requests with exponential backoff on 429 and 5xx responses.
 
 ## Installation
 
@@ -73,11 +73,11 @@ Input/output schemas, auth requirements, and descriptions are all derived from y
 ## Client Usage (Agent Adapter)
 
 ```python
-from halo_fastapi import HttpPlugin
+from halo_fastapi import HaloClient
 
-plugin = await HttpPlugin(
+plugin = await HaloClient(
     base_url="https://api.example.com",
-    credentials={"api.example.com": {"type": "bearer", "value": os.getenv("API_KEY")}}
+    bearer_token=os.getenv("API_KEY"),
 ).discover(tags=["payments"])
 
 # Fetch a single tool schema
@@ -110,13 +110,17 @@ halo/
 ├── halo-fastapi/              # Python reference implementation (Apache 2.0)
 │   └── src/halo_fastapi/
 │       ├── _schema.py         # HaloRegister server-side plugin
-│       ├── _plugin.py         # HttpPlugin client-side adapter
-│       └── _types.py          # Pydantic models for HALO schema types
-├── sample-api/                # HALO-compliant demo API
-│   ├── data/                  # JSON data files (weather, books, inventory, employees)
-│   └── src/sample_api/
-└── sample-agents/             # Agent consuming the sample API via HALO
-    └── src/sample_agent/
+│       ├── _client.py         # HaloClient client-side HTTP adapter
+│       ├── _types.py          # Pydantic models for HALO schema types
+│       ├── _constants.py      # Shared constants (content type, defaults)
+│       └── adapters/
+│           └── _agent_framework_adapter.py  # Agent Framework integration
+├── samples/                   # Sample applications
+│   ├── api/                   # HALO-compliant demo API
+│   │   ├── data/              # JSON data files (weather, books, inventory, employees)
+│   │   └── src/sample_api/
+│   └── agent-framework/       # Microsoft Agent Framework sample
+│       └── src/sample_agent_framework/
 ```
 
 ## Licence

@@ -4,14 +4,12 @@
 
 from __future__ import annotations
 
-import logging
-
 import agent_framework
 from agent_framework import azure
 
 import halo_fastapi
-from sample_agent import settings as settings_mod
-from sample_agent import tools as tools_mod
+from sample_agent_framework import settings as settings_mod
+from sample_agent_framework.utils.logger import create_logger
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant with access to a set of API tools. "
@@ -23,31 +21,33 @@ SYSTEM_PROMPT = (
 async def build() -> agent_framework.Agent:
     """Discover HALO tools and build the all-tools agent."""
     settings = settings_mod.Settings()
-    log = logging.getLogger(__name__)
+    log = create_logger("Agent")
 
     # 1. Discover HALO tools from the sample API.
-    domain = settings.api_base_url.split("://")[-1].split("/")[0]
-    plugin = halo_fastapi.HttpPlugin(
+    client = halo_fastapi.HaloClient(
         base_url=settings.api_base_url,
-        credentials={
-            domain: {"type": "bearer", "value": settings.api_token},
-        },
+        bearer_token=settings.api_token,
     )
-    await plugin.discover()
+    await client.discover()
 
     # 2. Convert HALO schemas to Agent Framework FunctionTools.
-    halo_tools = await tools_mod.create_tools(plugin)
-    log.info("Loaded %d HALO tool(s)", len(halo_tools))
+    adapter = halo_fastapi.HaloAgentFrameworkAdapter(client)
+    halo_tools = await adapter.create_tools()
+    log.success("HALO tools loaded", {"count": len(halo_tools)})
+
+    # Close the discovery session — tools will create a fresh session
+    # in uvicorn's event loop when invoked at runtime.
+    await client.close()
 
     # 3. Create the Azure OpenAI chat client and agent.
-    client = azure.AzureOpenAIChatClient(
+    llm_client = azure.AzureOpenAIChatClient(
         endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
         deployment_name=settings.azure_openai_deployment,
         api_version=settings.openai_api_version,
     )
     return agent_framework.Agent(
-        client=client,
+        client=llm_client,
         name="halo-all-tools",
         instructions=SYSTEM_PROMPT,
         tools=halo_tools,

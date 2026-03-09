@@ -17,15 +17,15 @@ Or use the **Sample API** launch profile in VS Code.
 
 ## Configuration
 
-Settings are managed via Pydantic Settings with the `SAMPLE_API_` env prefix:
+Settings are managed via Pydantic Settings. The `.env` file in the repository root is loaded automatically.
 
 | Variable | Default | Description |
 |---|---|---|
-| `SAMPLE_API_APP_TITLE` | `Sample HALO API` | API title |
-| `SAMPLE_API_APP_VERSION` | `0.1.0` | API version |
-| `SAMPLE_API_HOST` | `0.0.0.0` | Bind host |
-| `SAMPLE_API_PORT` | `3001` | Bind port |
-| `SAMPLE_API_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
+| `APP_TITLE` | `Sample HALO API` | API title |
+| `APP_VERSION` | `0.1.0` | API version |
+| `HOST` | `0.0.0.0` | Bind host |
+| `PORT` | `3001` | Bind port |
+| `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
 
 ## Endpoints
 
