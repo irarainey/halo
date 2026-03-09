@@ -141,16 +141,19 @@ halo/
 │       ├── _types.py          # Pydantic models for HALO schema types
 │       ├── _constants.py      # Shared constants (content type, defaults)
 │       └── adapters/
-│           └── _agent_framework_adapter.py  # Agent Framework integration
+│           ├── _agent_framework_adapter.py  # Agent Framework integration
+│           └── _semantic_kernel_adapter.py  # Semantic Kernel integration
 ├── samples/                   # Sample applications
 │   ├── api/                   # HALO-compliant demo API
 │   │   ├── data/              # JSON data files (weather, books, inventory, employees)
 │   │   └── src/sample_api/
-│   └── agent-framework/       # Microsoft Agent Framework sample
-│       └── src/sample_agent_framework/
+│   ├── agent-framework/       # Microsoft Agent Framework sample
+│   │   └── src/sample_agent_framework/
+│   └── semantic-kernel/       # Semantic Kernel sample
+│       └── src/sample_semantic_kernel/
 ```
 
 ## Licence
 
-- **HALO Protocol Specification** ([halo-specification.md](halo-specification.md)): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-- **halo-fastapi Reference Implementation** (all source code): [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- **HALO Protocol Specification** ([halo-specification.md](halo-specification.md)): [CC BY 4.0](LICENSE-SPECIFICATION)
+- **All source code**: [Apache 2.0](LICENSE)
