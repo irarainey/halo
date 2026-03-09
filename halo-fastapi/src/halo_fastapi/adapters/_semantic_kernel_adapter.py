@@ -17,6 +17,8 @@ import json
 import logging
 from typing import Annotated, Any
 
+from semantic_kernel import functions as functions_mod
+
 from halo_fastapi import _client, _types
 
 logger = logging.getLogger(__name__)
@@ -60,23 +62,28 @@ class HaloSemanticKernelAdapter:
             ImportError: If ``semantic-kernel`` is not installed.
         """
         try:
-            from semantic_kernel.functions import KernelFunction, KernelPlugin, kernel_function  # noqa: important[misplaced-import]
+            from semantic_kernel.functions import KernelFunction, KernelPlugin  # noqa: important[misplaced-import]
         except ImportError as exc:
-            msg = "semantic-kernel is required for HaloSemanticKernelAdapter. Install with: uv pip install semantic-kernel"
+            msg = (
+                "semantic-kernel is required for HaloSemanticKernelAdapter. "
+                "Install with: uv pip install semantic-kernel"
+            )
             raise ImportError(msg) from exc
 
         functions: list[KernelFunction] = []
 
         for entry in self._client.tools:
             schema = await self._client.get_tool(entry.url)
-            path = entry.url
-
-            func = _make_invoke_func(self._client, path, schema, kernel_function)
+            func = _make_invoke_func(self._client, entry.url, schema)
             kf = KernelFunction.from_method(func, plugin_name=plugin_name)
             functions.append(kf)
-            logger.debug("Created SK function: %s (%s)", kf.name, path)
+            logger.debug("Created SK function: %s (%s)", kf.name, entry.url)
 
-        logger.info("Built SK plugin '%s' with %d function(s)", plugin_name, len(functions))
+        logger.info(
+            "Built SK plugin '%s' with %d function(s)",
+            plugin_name,
+            len(functions),
+        )
         return KernelPlugin(name=plugin_name, functions=functions)
 
 
@@ -84,37 +91,37 @@ def _make_invoke_func(
     client: _client.HaloClient,
     path: str,
     schema: _types.HaloSchema,
-    kernel_function_decorator: Any,
 ) -> Any:
-    """Create a ``@kernel_function``-decorated async callable for a HALO tool.
+    """Create a ``@kernel_function``-decorated callable for a HALO tool.
 
-    Builds a function with explicit keyword parameters matching the
-    HALO input schema so Semantic Kernel can map LLM arguments
-    correctly (instead of bundling them into a single ``kwargs`` dict).
+    Builds a function whose signature matches the HALO input schema
+    so Semantic Kernel passes each argument by name rather than
+    bundling them into ``**kwargs``.
     """
+
     name = path.strip("/").replace("/", "_").replace("{", "").replace("}", "")
     description = schema.why or schema.description or name
-
-    # Build the parameter list from the HALO input schema.
     param_names = list(schema.input.keys())
-    param_descriptions = {p: schema.input[p].get("description", p) for p in param_names}
 
-    @kernel_function_decorator(name=name, description=description)
-    async def _invoke(**kwargs: Any) -> Annotated[str, "JSON result"]:
-        # SK may nest args under a "kwargs" key — unwrap if so.
+    @functions_mod.kernel_function(name=name, description=description)
+    async def _invoke(**kwargs: Any) -> str:
+        # SK 1.40 wraps arguments in a "kwargs" key despite signature
+        # patching. Unwrap if present.
         body = kwargs.get("kwargs", kwargs) if "kwargs" in kwargs else kwargs
         result = await client.invoke(path, body=body)
         return json.dumps(result)
 
-    # Patch the function's annotations so SK discovers the real parameters.
-    annotations: dict[str, Any] = {}
-    for p in param_names:
-        annotations[p] = Annotated[str, param_descriptions[p]]
-    annotations["return"] = Annotated[str, "JSON result"]
-    _invoke.__annotations__ = annotations
-
-    # Update the signature so SK introspects typed parameters.
-    params = [inspect.Parameter(p, inspect.Parameter.KEYWORD_ONLY, default=None) for p in param_names]
-    _invoke.__signature__ = inspect.Signature(params, return_annotation=Annotated[str, "JSON result"])  # type: ignore[attr-defined]
+    # Replace the **kwargs signature with explicit parameters so SK
+    # maps LLM arguments to named fields instead of a single dict.
+    _invoke.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+        parameters=[
+            inspect.Parameter(p, inspect.Parameter.KEYWORD_ONLY, default=None)
+            for p in param_names
+        ],
+    )
+    _invoke.__annotations__ = {
+        p: Annotated[str, schema.input[p].get("description", p)]
+        for p in param_names
+    }
 
     return _invoke
