@@ -23,9 +23,8 @@ log = logger.create_logger("Server")
 class _PersistingDevServer(_server.DevServer):
     """DevServer that persists conversation turns to disk.
 
-    The canonical persist happens at the end of ``_stream_execution``
-    by capturing the ``response.completed`` SSE event which contains
-    the full agent output in OpenAI format.
+    Captures the ``response.completed`` SSE event at the end of each
+    turn and writes it to the file-backed conversation store.
     """
 
     def __init__(
@@ -36,24 +35,15 @@ class _PersistingDevServer(_server.DevServer):
         super().__init__(**kwargs)
         self._persistence = persistence
 
-    # -- post-stream persistence ---------------------------------------------
-
     async def _stream_execution(  # type: ignore[override]
         self,
         executor: _server.AgentFrameworkExecutor,
         request: Any,
     ) -> AsyncGenerator[str]:
-        """Wrap the parent SSE stream and persist the completed turn.
-
-        The ``response.completed`` SSE event contains the full agent
-        response in standard OpenAI format.  We capture it and pass
-        it to the store so the thread file records every turn with
-        both the user input and agent output.
-        """
+        """Wrap the parent stream and persist the completed turn."""
         completed_response: dict[str, Any] | None = None
 
         async for chunk in super()._stream_execution(executor, request):
-            # Capture the response.completed event payload.
             if chunk.startswith("data: {") and "response.completed" in chunk:
                 try:
                     event = json.loads(chunk.removeprefix("data: ").strip())
@@ -63,26 +53,13 @@ class _PersistingDevServer(_server.DevServer):
                     pass
             yield chunk
 
-        # Persist the turn with the full response.
         try:
             conversation_id: str | None = request._get_conversation_id()
         except Exception:
             return
 
         if conversation_id:
-            user_input = ""
-            if isinstance(request.input, str):
-                user_input = request.input
-            elif isinstance(request.input, list):
-                for item in request.input:
-                    if isinstance(item, dict):
-                        for content in item.get("content", []):
-                            if isinstance(content, dict) and content.get("type") == "input_text":
-                                user_input = content.get("text", "")
-                                break
-                    if user_input:
-                        break
-
+            user_input = _extract_user_input(request.input)
             self._persistence.persist_turn(
                 conversation_id,
                 user_input=user_input,
@@ -91,12 +68,23 @@ class _PersistingDevServer(_server.DevServer):
             log.debug("Persisted thread", {"conversationId": conversation_id})
 
 
+def _extract_user_input(input_data: Any) -> str:
+    """Extract the user's text from the request input."""
+    if isinstance(input_data, str):
+        return input_data
+    if isinstance(input_data, list):
+        for item in input_data:
+            if isinstance(item, dict):
+                for content in item.get("content", []):
+                    if isinstance(content, dict) and content.get("type") == "input_text":
+                        return str(content.get("text", ""))
+    return ""
+
+
 def main() -> None:
     """Build agents and launch the DevUI."""
     config = settings.Settings()
     logger.configure_logging(config.log_level)
-
-    all_tools_agent = asyncio.run(halo_all_tools.build())
 
     persistence_store = store.FileBackedConversationStore(_THREADS_DIR)
     log.info("Persisting threads", {"path": str(_THREADS_DIR)})
@@ -105,12 +93,19 @@ def main() -> None:
         persistence=persistence_store,
         port=8080,
     )
-    server.register_entities([all_tools_agent])
+
+    # Build the agent; if the API is unreachable the DevUI still starts.
+    try:
+        agent = asyncio.run(halo_all_tools.build())
+        server.register_entities([agent])
+    except Exception:
+        log.warn("Agent build failed — is the sample API running on port 3001? The DevUI will start without tools.")
+
     app = server.get_app()
 
     log.section("HALO Agent Framework Sample")
     log.info("Starting DevUI", {"port": server.port})
-    uvicorn.run(app, host="127.0.0.1", port=server.port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=server.port, log_level="info")
 
 
 if __name__ == "__main__":
