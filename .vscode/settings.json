@@ -4,6 +4,7 @@
     "python.analysis.extraPaths": [
         "halo-fastapi/src",
         "samples/api/src",
-        "samples/agent-framework/src"
+        "samples/agent-framework/src",
+        "samples/semantic-kernel/src"
     ]
 }

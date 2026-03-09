@@ -13,6 +13,10 @@ Client-side:
 Agent Framework adapter (optional):
     ``HaloAgentFrameworkAdapter`` converts discovered tools into Agent Framework
     ``FunctionTool`` instances.  Requires the ``agent-framework`` extra.
+
+Semantic Kernel adapter (optional):
+    ``HaloSemanticKernelAdapter`` converts discovered tools into a Semantic Kernel
+    ``KernelPlugin``.  Requires the ``semantic-kernel`` extra.
 """
 
 from __future__ import annotations
@@ -39,9 +43,10 @@ from halo_fastapi._types import (
 
 if TYPE_CHECKING:
     from halo_fastapi.adapters._agent_framework_adapter import HaloAgentFrameworkAdapter
+    from halo_fastapi.adapters._semantic_kernel_adapter import HaloSemanticKernelAdapter
 
-# HaloAgentFrameworkAdapter is imported lazily via __getattr__ so the
-# agent-framework-core dependency stays optional.
+# HaloAgentFrameworkAdapter and HaloSemanticKernelAdapter are imported
+# lazily via __getattr__ so their heavy dependencies stay optional.
 
 __all__ = [
     "CONTENT_TYPE",
@@ -58,6 +63,7 @@ __all__ = [
     "HaloRegister",
     "HaloResilience",
     "HaloSchema",
+    "HaloSemanticKernelAdapter",
     "HaloToolEntry",
     "HaloTrust",
 ]
@@ -68,5 +74,9 @@ def __getattr__(name: str) -> object:
         from halo_fastapi.adapters._agent_framework_adapter import HaloAgentFrameworkAdapter
 
         return HaloAgentFrameworkAdapter
+    if name == "HaloSemanticKernelAdapter":
+        from halo_fastapi.adapters._semantic_kernel_adapter import HaloSemanticKernelAdapter
+
+        return HaloSemanticKernelAdapter
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

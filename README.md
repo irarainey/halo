@@ -7,9 +7,10 @@ HALO is a lightweight protocol convention that lets any HTTP API describe itself
 This repository contains:
 
 - **HALO Protocol Specification** — the full language and platform agnostic protocol spec ([halo-specification.md](halo-specification.md))
-- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`) and an agent-side client (`HaloClient`) with discovery, schema caching, credential injection, and retry
+- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`), an agent-side client (`HaloClient`), and framework adapters for Microsoft Agent Framework (`HaloAgentFrameworkAdapter`) and Semantic Kernel (`HaloSemanticKernelAdapter`)
 - **Sample API** — a FastAPI server implementing HALO-compliant endpoints across four domains
-- **Sample Agent** — an LLM agent application consuming the sample API via HALO using Microsoft Agent Framework
+- **Sample Agent (Agent Framework)** — an LLM agent with browser-based DevUI using Microsoft Agent Framework
+- **Sample Agent (Semantic Kernel)** — an LLM agent with interactive CLI chat using Semantic Kernel
 
 ## How It Works
 
@@ -101,6 +102,32 @@ result = await plugin.invoke("/api/payments/charge", body={"amount": 1000, "curr
 ## Specification
 
 The full protocol specification is in [halo-specification.md](halo-specification.md). The protocol is language and platform agnostic — any HTTP server in any language can implement HALO.
+
+## Running the Samples
+
+The repository includes a dev container with all tooling pre-configured. Open in VS Code with the Dev Containers extension.
+
+### Poe tasks
+
+| Command | Description |
+|---|---|
+| `poe api` | Start the sample API on port 3001 |
+| `poe maf` | Start the Agent Framework DevUI (requires API) |
+| `poe sk` | Start the Semantic Kernel CLI chat (requires API) |
+| `poe sync:maf` | Sync dependencies for Agent Framework |
+| `poe sync:sk` | Sync dependencies for Semantic Kernel |
+| `poe test` | Run unit tests |
+| `poe lint` | Run ruff and mypy |
+| `poe format` | Auto-format code |
+
+### VS Code launch profiles
+
+| Profile | Description |
+|---|---|
+| **Sample API + Agent Framework** | Starts both; syncs MAF dependencies first |
+| **Sample API + Semantic Kernel** | Starts both; syncs SK dependencies first |
+
+> **Note:** The Agent Framework and Semantic Kernel samples have conflicting transitive dependencies and cannot be installed simultaneously. Use `poe sync:maf` or `poe sync:sk` to switch between them.
 
 ## Repository Structure
 

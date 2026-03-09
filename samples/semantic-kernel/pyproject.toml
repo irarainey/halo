@@ -1,0 +1,20 @@
+[project]
+name = "halo-sample-semantic-kernel"
+version = "0.0.1"
+description = "Sample LLM agent CLI that consumes a HALO-compliant API using Semantic Kernel."
+license = "Apache-2.0"
+requires-python = ">=3.13"
+dependencies = [
+    "halo-fastapi",
+    "semantic-kernel>=1.40.0",
+    "python-dotenv>=1.2.1",
+    "pydantic-settings>=2.13.1",
+    "rich>=14.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sample_semantic_kernel"]

@@ -40,7 +40,7 @@ This creates three separate layers: the API, the description, and the translatio
 
 Schema drift is the default outcome of the current approach. The API changes, the tool description does not, and the LLM confidently calls the endpoint with stale parameters. No error surfaces at the description layer — just downstream failures that require log forensics to diagnose. In production systems with dozens of APIs maintained by different teams, this is not an edge case. It is what happens.
 
-Industry data confirms this is not a theoretical concern. A 2024 report found that **75% of production APIs have endpoints that do not match their published specifications**. Tool descriptions in agent frameworks are maintained with even less rigour than OpenAPI specs — meaning the real-world drift rate for MCP server definitions is likely higher still.
+Industry data confirms this is not a theoretical concern. A 2024 report found that **75% of production APIs have endpoints that do not match their published specifications**. Modern frameworks like FastAPI can auto-generate OpenAPI specs from code, which significantly reduces structural drift — but even auto-generated OpenAPI lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not designed for agent consumption. Tool descriptions in agent frameworks are maintained with even less rigour than OpenAPI specs — meaning the real-world drift rate for MCP server definitions is likely higher still.
 
 | Problem | Consequence |
 |---|---|
@@ -304,28 +304,34 @@ The LLM never handles secrets directly — it decides what to call, the runtime 
 
 Any HALO implementation — regardless of language — needs to map the protocol's schema fields to the tool primitive of the target agent framework. The core adapter logic is always the same three steps: discover via `OPTIONS /`, fetch schema via `OPTIONS /route`, invoke via the real HTTP verb. The wrapping layer is the only thing that varies per framework.
 
-> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. `HaloAgentFrameworkAdapter` is implemented in `halo-fastapi` as an optional extra (`halo-fastapi[agent-framework]`) for Microsoft Agent Framework. The remaining adapter classes (`HaloLangChainToolkit`, `HaloToolLoader`) illustrate the target integration pattern for other frameworks but are not yet implemented.
+> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. `HaloAgentFrameworkAdapter` and `HaloSemanticKernelAdapter` are implemented in `halo-fastapi` for Microsoft Agent Framework and Semantic Kernel respectively. The remaining adapter classes (`HaloLangChainAdapter`, `HaloLlamaIndexAdapter`) illustrate the target integration pattern for other frameworks but are not yet implemented.
 
 ### 5.1 Semantic Kernel
 
 ```python
-kernel = Kernel()
-kernel.add_service(OpenAIChatCompletion(service_id='gpt4', ai_model_id='gpt-4o'))
+from halo_fastapi import HaloClient, HaloSemanticKernelAdapter
+from semantic_kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 
-# One line — discovers all tools, registers as native KernelFunctions
-plugin = await HaloClient('https://api.example.com', bearer_token=token).discover(tags=['payments'])
+kernel = Kernel()
+kernel.add_service(AzureChatCompletion(service_id='chat', ...))
+
+# Discover HALO tools and build a Semantic Kernel plugin
+client = await HaloClient('https://api.example.com', bearer_token=token).discover(tags=['payments'])
+adapter = HaloSemanticKernelAdapter(client)
+plugin = await adapter.create_plugin()  # KernelPlugin
 kernel.add_plugin(plugin)
 
 result = await kernel.invoke_prompt('Charge customer cust_123 £25')
 ```
 
-The plugin auto-maps OPTIONS schema fields to SK primitives: `why` becomes the function description, `effects.reversible` informs undo/recovery logic, `resilience.retry` configures retry policy, and `next` registers planner hints for workflow chaining.
+The adapter wraps each discovered HALO tool as a ``@kernel_function``-decorated async function inside a ``KernelPlugin``. The ``why`` field becomes the function description, enabling Semantic Kernel's automatic function calling via ``FunctionChoiceBehavior.Auto()``.
 
 ### 5.2 LangChain
 
 ```python
-toolkit = HaloLangChainToolkit('https://api.example.com', credentials)
-tools = await toolkit.get_tools(tags=['payments'])
+adapter = HaloLangChainAdapter('https://api.example.com', credentials)
+tools = await adapter.create_tools(tags=['payments'])
 
 agent = create_openai_tools_agent(llm, tools, prompt)
 executor = AgentExecutor(agent=agent, tools=tools)
@@ -339,13 +345,13 @@ from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
 import agent_framework
 
 # 1. Discover HALO tools
-plugin = await HaloClient(
+client = await HaloClient(
     base_url='https://api.example.com',
     bearer_token=token,
 ).discover(tags=['payments'])
 
 # 2. Convert to Agent Framework FunctionTools
-adapter = HaloAgentFrameworkAdapter(plugin)
+adapter = HaloAgentFrameworkAdapter(client)
 tools = await adapter.create_tools()
 
 # 3. Create and run the agent
@@ -360,13 +366,13 @@ agent = agent_framework.Agent(
 
 ```python
 from llama_index.core.agent import ReActAgent
-from halo_fastapi import HaloToolLoader
+from halo_fastapi import HaloLlamaIndexAdapter
 
-loader = HaloToolLoader(
+adapter = HaloLlamaIndexAdapter(
     base_url='https://api.example.com',
     credentials=credentials
 )
-tools = await loader.load_tools(tags=['payments'])
+tools = await adapter.create_tools(tags=['payments'])
 
 agent = ReActAgent.from_tools(tools, llm=llm, verbose=True)
 response = agent.chat('Send a welcome email to the new customer')
@@ -438,10 +444,10 @@ Skills — blocks of text injected into context describing how the LLM should be
 | Dimension | Skills | OPTIONS Protocol | Winner |
 |---|---|---|---|
 | Implementation effort | Write text — minutes | Add OPTIONS handler — hours | Skills win initially |
-| Maintenance over time | Manual — drifts silently | Automatic — cannot drift | Protocol wins at scale |
-| Accuracy | As good as the author | Always correct — derived from code | Protocol wins |
+| Maintenance over time | Manual — drifts silently | Structural schema cannot drift; LLM fields (`why`, `tags`) still manual | Protocol wins at scale |
+| Accuracy | As good as the author | Structural fields always correct — derived from code. LLM hints (`why`, `effects`) are hand-written but co-located with the model | Protocol wins |
 | Auth description | Prose — easy to get wrong | Detected and typed automatically | Protocol wins |
-| Schema changes | Someone must update manually | Reflects instantly — same deploy | Protocol wins |
+| Schema changes | Someone must update manually | Structural changes reflect instantly — same deploy. LLM metadata changes require a code edit to `json_schema_extra` | Protocol wins |
 | Token cost | All loaded upfront always | Lazy, filtered, on demand | Protocol wins |
 | Validation | None — it is text | Testable in CI against live endpoint | Protocol wins |
 | Failure mode | Silent incorrect calls | Explicit 400/422 with structured error | Protocol wins |
@@ -451,7 +457,9 @@ Skills — blocks of text injected into context describing how the LLM should be
 
 Skills fail silently and at the worst possible time. The API changes, the skill doesn't, and the LLM confidently calls the endpoint with stale parameter names. The failure surfaces as incorrect agent behaviour — not as a schema error — and requires log forensics to diagnose.
 
-The OPTIONS protocol cannot drift because the schema and the code are the same artifact. The Pydantic model that validates the incoming request is the same model that generates the OPTIONS response. If the model changes, the schema changes atomically with it in the same deployment.
+The OPTIONS protocol cannot drift *structurally* because the schema and the code are the same artifact. The Pydantic model that validates the incoming request is the same model that generates the OPTIONS response. If the model changes, the schema changes atomically with it in the same deployment.
+
+> **Honest caveat:** HALO's LLM-native fields — `why`, `tags`, `effects`, `next`, and `examples` — are hand-written metadata in `json_schema_extra`. These can drift from reality in the same way any documentation can. The difference is that they live alongside the Pydantic model in the same file, making staleness visible during code review. Structural fields (inputs, outputs, types, constraints, auth) are fully auto-derived and cannot drift.
 
 ### 7.3 Where Each Belongs
 
@@ -581,7 +589,7 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 | Standard | Relationship to HALO |
 |---|---|
 | HAL (Hypertext Application Language) | Hypermedia links in response bodies for API navigation. No LLM-native fields. Complementary. |
-| OpenAPI / Swagger | Comprehensive API description in a separate static file. 75% of production APIs don't match their specs. |
+| OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not served per-endpoint at runtime. |
 | agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent but still a static file — inherits drift problems. |
 | HAL MCP Server | An MCP server wrapping HTTP APIs for LLMs. Adds the MCP layer rather than removing it. |
 | GraphQL Introspection | Runtime schema discovery — genuinely live and self-describing, but locked to GraphQL. HALO fills this gap for REST. |
@@ -881,20 +889,20 @@ The same `halo-fastapi` package provides `HaloClient` — the client-side adapte
 ```python
 from halo_fastapi import HaloClient
 
-plugin = HaloClient(
+client = HaloClient(
     base_url='https://api.example.com',
     bearer_token=os.getenv('API_KEY'),
 )
 
 # Discover all tools, or filter by tag
-await plugin.discover()                    # all tools
-await plugin.discover(tags=['payments'])   # filtered
+await client.discover()                    # all tools
+await client.discover(tags=['payments'])   # filtered
 
 # Schemas are cached — OPTIONS only fired once per route per session
-schema = await plugin.get_tool('/api/payments/charge')
+schema = await client.get_tool('/api/payments/charge')
 
 # Invoke a tool directly — credentials injected automatically
-result = await plugin.invoke('/api/payments/charge', body={'amount': 1000})
+result = await client.invoke('/api/payments/charge', body={'amount': 1000})
 ```
 
 ### 12.2 What HaloClient Does Internally
@@ -903,7 +911,7 @@ When `discover()` is called, `HaloClient` performs the following sequence:
 
 1. Fires `OPTIONS /` with `Accept: application/llm+json` — receives the root manifest with tool URLs, names, descriptions, and tags
 2. If tags were requested, the query `?tags=tag1,tag2` is appended and server-side filtering applies
-3. Stores the tool list from the manifest as `plugin.tools`
+3. Stores the tool list from the manifest as `client.tools`
 4. On `get_tool(path)`, fires `OPTIONS /route` to fetch the full schema and caches it
 5. On `invoke(path, body)`, fetches the schema (cached), injects credentials from the credential map based on the target domain, and fires the real HTTP call using the method and URL from the schema
 6. Failed requests are retried with exponential backoff on connection errors, HTTP 429, and 5xx responses
@@ -913,7 +921,7 @@ When `discover()` is called, `HaloClient` performs the following sequence:
 For the common case of a single API with a bearer token, use the `bearer_token` convenience parameter:
 
 ```python
-plugin = HaloClient(base_url='https://api.example.com', bearer_token=os.getenv('API_KEY'))
+client = HaloClient(base_url='https://api.example.com', bearer_token=os.getenv('API_KEY'))
 ```
 
 For advanced scenarios (multiple hosts, API keys, basic auth), pass a credential map keyed by domain (with optional port):
@@ -923,7 +931,7 @@ credentials = {
     'api.example.com':      {'type': 'bearer', 'value': os.getenv('API_KEY')},
     'api.internal.com:8443': {'type': 'apikey', 'header': 'X-API-Key', 'value': os.getenv('INTERNAL_KEY')},
 }
-plugin = HaloClient(base_url='https://api.example.com', credentials=credentials)
+client = HaloClient(base_url='https://api.example.com', credentials=credentials)
 ```
 
 Supported credential types:
@@ -936,17 +944,30 @@ Supported credential types:
 
 ### 12.4 Framework Integration
 
-`halo-fastapi` includes `HaloAgentFrameworkAdapter` as an optional extra for Microsoft Agent Framework. Install with `halo-fastapi[agent-framework]`:
+`halo-fastapi` includes adapters for Microsoft Agent Framework and Semantic Kernel.
+
+**Agent Framework** — install with `halo-fastapi[agent-framework]`:
 
 ```python
 from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
 
-plugin = await HaloClient(base_url, bearer_token=token).discover()
-adapter = HaloAgentFrameworkAdapter(plugin)
+client = await HaloClient(base_url, bearer_token=token).discover()
+adapter = HaloAgentFrameworkAdapter(client)
 tools = await adapter.create_tools()  # list[FunctionTool]
 ```
 
-For other frameworks — Semantic Kernel, LangChain, LlamaIndex — the same pattern applies: wrap `plugin.invoke()` in the framework's tool primitive.
+**Semantic Kernel** — install `semantic-kernel` separately (transitive dependency conflict with `agent-framework-core` prevents a shared extra):
+
+```python
+from halo_fastapi import HaloClient, HaloSemanticKernelAdapter
+
+client = await HaloClient(base_url, bearer_token=token).discover()
+adapter = HaloSemanticKernelAdapter(client)
+plugin = await adapter.create_plugin()  # KernelPlugin
+kernel.add_plugin(plugin)
+```
+
+Both adapters follow the same pattern: discover via `HaloClient`, pass the client to the adapter, and call the adapter's creation method. For other frameworks — LangChain, LlamaIndex — the same pattern applies: wrap `client.invoke()` in the framework's tool primitive.
 
 > **Package boundary:** `halo-fastapi` is one implementation of the HALO protocol. A developer building a Node.js agent would use a separate `halo-node` package that performs identical OPTIONS calls and maps the same schema fields to its framework primitives. The protocol is the contract. The packages are convenient implementations of that contract.
 
@@ -970,9 +991,9 @@ For other frameworks — Semantic Kernel, LangChain, LlamaIndex — the same pat
 
 ### Phase 3 — Framework Adapters (Month 2)
 
-1. Semantic Kernel `HaloClient` with lazy loading, tag filtering, and SK safety integration
-2. LangChain `HaloLangChainToolkit`
-3. LlamaIndex `HaloToolLoader`
+1. Semantic Kernel `HaloSemanticKernelAdapter` *(implemented)*
+2. LangChain `HaloLangChainAdapter`
+3. LlamaIndex `HaloLlamaIndexAdapter`
 4. Microsoft Agent Framework `HaloAgentFrameworkAdapter` with Azure credential integration
 5. Reference demo: multi-tool agent with zero static tool definitions
 

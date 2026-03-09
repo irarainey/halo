@@ -569,7 +569,7 @@ requires-dist = [
     { name = "agent-framework-core", marker = "extra == 'agent-framework'", specifier = ">=1.0.0rc2" },
     { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "fastapi", specifier = ">=0.129.0" },
-    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pydantic", specifier = ">=2.0" },
 ]
 provides-extras = ["agent-framework"]
 

@@ -69,12 +69,32 @@ uv add "halo-fastapi[agent-framework]"
 ```python
 from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
 
-plugin = await HaloClient(base_url="https://api.example.com").discover()
-adapter = HaloAgentFrameworkAdapter(plugin)
+client = await HaloClient(base_url="https://api.example.com").discover()
+adapter = HaloAgentFrameworkAdapter(client)
 tools = await adapter.create_tools()  # list[FunctionTool]
 ```
 
 `create_tools()` fetches the full schema for each discovered tool via `HaloClient.get_tool()` and builds a `FunctionTool` from the result. Schemas are cached by `HaloClient` so subsequent invocations do not repeat the OPTIONS requests.
+
+## Semantic Kernel Integration (Optional)
+
+`HaloSemanticKernelAdapter` converts discovered HALO tools into a Semantic Kernel `KernelPlugin`. Install `semantic-kernel` directly (not as an extra, due to transitive dependency conflicts with `agent-framework-core`):
+
+```bash
+uv pip install semantic-kernel
+```
+
+```python
+from halo_fastapi import HaloClient, HaloSemanticKernelAdapter
+
+client = await HaloClient(base_url="https://api.example.com").discover()
+adapter = HaloSemanticKernelAdapter(client)
+plugin = await adapter.create_plugin()  # KernelPlugin
+
+kernel.add_plugin(plugin)
+```
+
+`create_plugin()` wraps each discovered tool as a `@kernel_function`-decorated async function inside a `KernelPlugin`. Semantic Kernel handles automatic function calling when `FunctionChoiceBehavior.Auto()` is configured.
 
 ## Licence
 

@@ -9,6 +9,38 @@
                 "reveal": "silent",
                 "close": true
             }
+        },
+        {
+            "label": "Sync MAF",
+            "type": "shell",
+            "command": "uv sync --all-packages",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "Sync SK",
+            "type": "shell",
+            "command": "uv sync --all-packages && uv pip install -e samples/semantic-kernel",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "Sync MAF + Wait for API",
+            "dependsOn": ["Sync MAF", "Wait for API"],
+            "dependsOrder": "sequence"
+        },
+        {
+            "label": "Sync SK + Wait for API",
+            "dependsOn": ["Sync SK", "Wait for API"],
+            "dependsOrder": "sequence"
         }
     ]
 }

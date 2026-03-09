@@ -29,13 +29,30 @@
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "envFile": "${workspaceFolder}/.env",
-            "preLaunchTask": "Wait for API"
+            "preLaunchTask": "Sync MAF + Wait for API"
+        },
+        {
+            "name": "Semantic Kernel",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "sample_semantic_kernel.main",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "cwd": "${workspaceFolder}/samples/semantic-kernel/src",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "envFile": "${workspaceFolder}/.env",
+            "preLaunchTask": "Sync SK + Wait for API"
         }
     ],
     "compounds": [
         {
             "name": "Sample API + Agent Framework",
             "configurations": ["Sample API", "Agent Framework"],
+            "stopAll": true
+        },
+        {
+            "name": "Sample API + Semantic Kernel",
+            "configurations": ["Sample API", "Semantic Kernel"],
             "stopAll": true
         }
     ]
