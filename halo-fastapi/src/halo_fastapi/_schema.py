@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""HaloDiscovery — server-side FastAPI plugin for the HALO protocol.
+"""HaloRegister — server-side FastAPI plugin for the HALO protocol.
 
-A single call to ``HaloDiscovery(app)`` introspects all routes at startup
+A single call to ``HaloRegister(app)`` introspects all routes at startup
 and registers ``OPTIONS`` handlers that serve ``application/llm+json``
 schemas describing each endpoint.
 """
@@ -166,16 +166,16 @@ def _build_schema(
     )
 
 
-class HaloDiscovery:
+class HaloRegister:
     """FastAPI plugin that makes every route HALO-compliant.
 
     Usage::
 
-        from halo_fastapi import HaloDiscovery
+        from halo_fastapi import HaloRegister
         from fastapi import FastAPI
 
         app = FastAPI(title="My API", version="1.0.0")
-        HaloDiscovery(app)
+        HaloRegister(app)
 
     At startup the plugin introspects all registered routes, extracts
     Pydantic schemas and dependency-injected auth, then registers

@@ -16,8 +16,8 @@ _logger = logging.getLogger(__name__)
 
 app = fastapi.FastAPI(title=_settings.app_title, version=_settings.app_version)
 
-# Register the HALO discovery endpoints with the FastAPI app
-halo_fastapi.HaloDiscovery(app)
+# Register the HALO endpoints with FastAPI - this is the only code needed in the API
+halo_fastapi.HaloRegister(app)
 
 _logger.info("Sample API configured — %s v%s", _settings.app_title, _settings.app_version)
 

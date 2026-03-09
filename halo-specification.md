@@ -615,18 +615,18 @@ uv add halo-fastapi
 
 The package exposes two primary objects:
 
-- **`HaloDiscovery`** — the server-side FastAPI plugin
+- **`HaloRegister`** — the server-side FastAPI plugin
 - **`HttpPlugin`** — the client-side agent adapter
 
-Together they are the complete HALO integration: `HaloDiscovery` makes an API HALO-compliant, `HttpPlugin` makes an agent capable of consuming any HALO-compliant API.
+Together they are the complete HALO integration: `HaloRegister` makes an API HALO-compliant, `HttpPlugin` makes an agent capable of consuming any HALO-compliant API.
 
-### 11.2 The HaloDiscovery Plugin
+### 11.2 The HaloRegister Plugin
 
 A single line added to any FastAPI application makes every route HALO-compliant. The plugin introspects the existing application at startup and derives everything it needs from metadata that already exists. No routes change. No models change. No decorators are required.
 
-### 11.3 What HaloDiscovery(app) Actually Does
+### 11.3 What HaloRegister(app) Actually Does
 
-When `HaloDiscovery(app)` is called at startup, it performs the following steps automatically:
+When `HaloRegister(app)` is called at startup, it performs the following steps automatically:
 
 #### Step 1 — Route Introspection
 
@@ -740,21 +740,21 @@ def register_options_handlers(app, schemas: dict):
         make_handler(schema)
 ```
 
-> **The complete picture:** `HaloDiscovery(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
+> **The complete picture:** `HaloRegister(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
 
 ### 11.4 Complete Server Example
 
 The example below is annotated to show exactly where each HALO field comes from. Tags and the tool description are the two fields most commonly misunderstood.
 
 ```python
-from halo_fastapi import HaloDiscovery
+from halo_fastapi import HaloRegister
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal
 
 app = FastAPI(title='Payments API', version='1.0.0')
-HaloDiscovery(app)  # ← registers OPTIONS handlers for every route at startup
+HaloRegister(app)  # ← registers OPTIONS handlers for every route at startup
 
 
 class ChargeResponse(BaseModel):

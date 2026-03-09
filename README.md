@@ -7,7 +7,7 @@ HALO is a lightweight protocol convention that lets any HTTP API describe itself
 This repository contains:
 
 - **HALO Protocol Specification** — the full language and platform agnostic protocol spec ([halo-specification.md](halo-specification.md))
-- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloDiscovery`) and an agent-side HTTP client (`HttpPlugin`) with discovery, schema caching, credential injection, and retry
+- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloRegister`) and an agent-side HTTP client (`HttpPlugin`) with discovery, schema caching, credential injection, and retry
 - **Sample API** — a FastAPI server implementing HALO-compliant endpoints across four domains
 - **Sample Agents** — an LLM agent application using Microsoft Agent Framework and DevUI to consume the sample API via HALO
 
@@ -61,11 +61,11 @@ uv add halo-fastapi
 A single line makes every route HALO-compliant:
 
 ```python
-from halo_fastapi import HaloDiscovery
+from halo_fastapi import HaloRegister
 from fastapi import FastAPI
 
 app = FastAPI(title="My API", version="1.0.0")
-HaloDiscovery(app)  # registers OPTIONS handlers automatically
+HaloRegister(app)  # registers OPTIONS handlers automatically
 ```
 
 Input/output schemas, auth requirements, and descriptions are all derived from your existing Pydantic models, route decorators, and dependency injection — no extra configuration needed. LLM-native fields like `why`, `tags`, and `effects` can be added via `json_schema_extra` on your Pydantic models.
@@ -109,7 +109,7 @@ halo/
 ├── halo-specification.md      # Full protocol specification (CC BY 4.0)
 ├── halo-fastapi/              # Python reference implementation (Apache 2.0)
 │   └── src/halo_fastapi/
-│       ├── _schema.py         # HaloDiscovery server-side plugin
+│       ├── _schema.py         # HaloRegister server-side plugin
 │       ├── _plugin.py         # HttpPlugin client-side adapter
 │       └── _types.py          # Pydantic models for HALO schema types
 ├── sample-api/                # HALO-compliant demo API
