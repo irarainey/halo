@@ -15,12 +15,14 @@ This repository contains:
 ## How It Works
 
 ```
-1. OPTIONS /?tags=payments       → discover relevant tools (cheap manifest)
-2. OPTIONS /api/payments/charge  → fetch full schema (lazy, on demand)
+1. OPTIONS /                     → discover all available tools
+2. OPTIONS /api/payments/charge  → fetch full schema for a specific tool
 3. POST /api/payments/charge     → call the API directly — no proxy
 ```
 
-An LLM agent sends `OPTIONS` with `Accept: application/llm+json` to any endpoint. The API returns a compact JSON schema describing what it does, how to call it, what auth it needs, and what side effects it has. The agent then calls the real endpoint directly.
+An LLM agent sends `OPTIONS /` with `Accept: application/llm+json` to get a manifest of all available tools — their names, descriptions, and tags. When it selects a tool, it sends `OPTIONS` to that specific endpoint to get the full schema. Then it calls the real endpoint directly.
+
+Tools can be filtered by tag (`OPTIONS /?tags=payments`) so agents only discover what is relevant to their task.
 
 ### Schema Response Example
 
