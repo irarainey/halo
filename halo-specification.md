@@ -40,7 +40,7 @@ This creates three separate layers: the API, the description, and the translatio
 
 Schema drift is the default outcome of the current approach. The API changes, the tool description does not, and the LLM confidently calls the endpoint with stale parameters. No error surfaces at the description layer — just downstream failures that require log forensics to diagnose. In production systems with dozens of APIs maintained by different teams, this is not an edge case. It is what happens.
 
-Industry data confirms this is not a theoretical concern. A 2024 report found that **75% of production APIs have endpoints that do not match their published specifications**. Modern frameworks like FastAPI can auto-generate OpenAPI specs from code, which significantly reduces structural drift — but even auto-generated OpenAPI lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not designed for agent consumption. Tool descriptions in agent frameworks are maintained with even less rigour than OpenAPI specs — meaning the real-world drift rate for MCP server definitions is likely higher still.
+When API descriptions are maintained separately from the code — whether as OpenAPI specs, MCP server definitions, or tool descriptions — they tend to diverge over time. Modern frameworks like FastAPI can auto-generate OpenAPI specs from code, which significantly reduces structural drift — but even auto-generated OpenAPI lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not designed for agent consumption.
 
 | Problem | Consequence |
 |---|---|
@@ -66,8 +66,6 @@ To maintain clean architecture and proper separation of concerns, an MCP server 
 The alternative — embedding MCP directly inside the existing API — avoids the operational overhead but introduces a different problem. MCP is a transport and tool-description protocol. An API is a domain service. Bundling protocol concerns into a domain service conflates two distinct responsibilities: serving domain logic and acting as an agent transport layer. These have different reasons to change and different lifecycles. If MCP evolves, is versioned, or is replaced by a successor protocol, your domain service has to change with it. In a microservices architecture this also contaminates service boundaries that were deliberately drawn.
 
 > **The MCP dilemma:** With MCP you face an unavoidable choice — either maintain a separate service and accept the operational overhead, or embed MCP in your API and accept the separation of concerns violation. There is no clean option. HALO dissolves this dilemma entirely. An OPTIONS handler is not a foreign concern bolted onto the API — it is the API describing itself using a standard HTTP mechanism it already supports. No new protocol layer is introduced. No new service is required. Domain logic and self-description are not two separate concerns: every well-designed API should be able to answer the question "how do I call you?"
-
-The scale of the problem is evidenced by MCP adoption patterns. Despite MCP generating over 22,000 tagged GitHub repositories within six months of release, fewer than 5% include actual MCP servers — with those that exist being predominantly small single-maintainer projects dominated by repetitive scaffolding. The overhead of building and maintaining MCP servers is suppressing adoption. The protocol solves the wrong problem with too much ceremony.
 
 ### 1.4 The Proxy Problem
 
