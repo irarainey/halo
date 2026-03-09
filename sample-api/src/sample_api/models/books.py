@@ -1,17 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 import pydantic
+
+
+def _to_lower(value: Any) -> Any:
+    """Normalise string input to lowercase for case-insensitive Literal matching."""
+    return value.lower() if isinstance(value, str) else value
 
 
 class BookSearchRequest(pydantic.BaseModel):
     """Request body for the book search endpoint. Accepts a search query and optional genre filter."""
 
     query: str = pydantic.Field(..., description="Search term to match against book titles or author names")
-    genre: Literal["fiction", "non-fiction", "technology"] | None = pydantic.Field(
-        None, description="Optional genre filter to narrow results"
-    )
+    genre: Annotated[
+        Literal["fiction", "non-fiction", "technology"] | None,
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field(None, description="Optional genre filter to narrow results")
 
     model_config = pydantic.ConfigDict(
         json_schema_extra={

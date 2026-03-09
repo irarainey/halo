@@ -7,9 +7,9 @@ HALO is a lightweight protocol convention that lets any HTTP API describe itself
 This repository contains:
 
 - **HALO Protocol Specification** — the full language and platform agnostic protocol spec ([halo-specification.md](halo-specification.md))
-- **`halohttp`** — the Python reference implementation (FastAPI plugin + agent adapter)
-- **Sample API** — a FastAPI server implementing HALO-compliant endpoints
-- **Sample Agent** — an LLM agent application using Microsoft Agent Framework to consume the sample API via HALO
+- **`halo-fastapi`** — a Python package providing a FastAPI server-side plugin (`HaloDiscovery`) and an agent-side HTTP client (`HttpPlugin`) with discovery, schema caching, credential injection, and retry
+- **Sample API** — a FastAPI server implementing HALO-compliant endpoints across four domains
+- **Sample Agents** — an LLM agent application using Microsoft Agent Framework and DevUI to consume the sample API via HALO
 
 ## How It Works
 
@@ -47,12 +47,13 @@ An LLM agent sends `OPTIONS` with `Accept: application/llm+json` to any endpoint
 - **Auth-aware scoping** — pass a token with `OPTIONS /` and the manifest reflects only what those credentials permit.
 - **Lazy loading** — full schemas are fetched only when the agent selects a tool, keeping token costs low.
 - **Direct call path** — no proxy layer. Agent calls the API directly. Two hops: agent → API.
-- **Framework adapters** — built-in support for Semantic Kernel, LangChain, LlamaIndex, and Microsoft Agent Framework.
+- **Credential injection** — `HttpPlugin` injects bearer tokens, API keys, or basic auth from a credential map at call time.
+- **Retry with backoff** — `HttpPlugin` retries failed requests with exponential backoff on 429 and 5xx responses.
 
 ## Installation
 
 ```bash
-uv add halohttp
+uv add halo-fastapi
 ```
 
 ## Server Usage (FastAPI)
@@ -60,11 +61,11 @@ uv add halohttp
 A single line makes every route HALO-compliant:
 
 ```python
-from halohttp import LLMSchema
+from halo_fastapi import HaloDiscovery
 from fastapi import FastAPI
 
 app = FastAPI(title="My API", version="1.0.0")
-LLMSchema(app)  # registers OPTIONS handlers automatically
+HaloDiscovery(app)  # registers OPTIONS handlers automatically
 ```
 
 Input/output schemas, auth requirements, and descriptions are all derived from your existing Pydantic models, route decorators, and dependency injection — no extra configuration needed. LLM-native fields like `why`, `tags`, and `effects` can be added via `json_schema_extra` on your Pydantic models.
@@ -72,17 +73,18 @@ Input/output schemas, auth requirements, and descriptions are all derived from y
 ## Client Usage (Agent Adapter)
 
 ```python
-from halohttp import HttpPlugin
+from halo_fastapi import HttpPlugin
 
 plugin = await HttpPlugin(
     base_url="https://api.example.com",
     credentials={"api.example.com": {"type": "bearer", "value": os.getenv("API_KEY")}}
 ).discover(tags=["payments"])
 
-# Use with your preferred framework
-kernel.add_plugin(plugin.to_semantic_kernel())   # Semantic Kernel
-tools = plugin.to_langchain()                    # LangChain
-tools = plugin.to_llama_index()                  # LlamaIndex
+# Fetch a single tool schema
+schema = await plugin.get_tool("/api/payments/charge")
+
+# Invoke a tool directly
+result = await plugin.invoke("/api/payments/charge", body={"amount": 1000, "currency": "GBP", "customer_id": "cust_123"})
 ```
 
 ## What HALO Replaces
@@ -100,7 +102,24 @@ tools = plugin.to_llama_index()                  # LlamaIndex
 
 The full protocol specification is in [halo-specification.md](halo-specification.md). The protocol is language and platform agnostic — any HTTP server in any language can implement HALO.
 
+## Repository Structure
+
+```text
+halo/
+├── halo-specification.md      # Full protocol specification (CC BY 4.0)
+├── halo-fastapi/              # Python reference implementation (Apache 2.0)
+│   └── src/halo_fastapi/
+│       ├── _schema.py         # HaloDiscovery server-side plugin
+│       ├── _plugin.py         # HttpPlugin client-side adapter
+│       └── _types.py          # Pydantic models for HALO schema types
+├── sample-api/                # HALO-compliant demo API
+│   ├── data/                  # JSON data files (weather, books, inventory, employees)
+│   └── src/sample_api/
+└── sample-agents/             # Agent consuming the sample API via HALO
+    └── src/sample_agent/
+```
+
 ## Licence
 
 - **HALO Protocol Specification** ([halo-specification.md](halo-specification.md)): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-- **halohttp Reference Implementation** (all source code): [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- **halo-fastapi Reference Implementation** (all source code): [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)

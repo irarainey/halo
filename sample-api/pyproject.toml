@@ -1,11 +1,11 @@
 [project]
 name = "halo-sample-api"
 version = "0.0.1"
-description = "Sample FastAPI server showcasing the HALO protocol with halohttp."
+description = "Sample FastAPI server showcasing the HALO protocol with halo-fastapi."
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
-    "halohttp",
+    "halo-fastapi",
     "fastapi>=0.129.0",
     "uvicorn[standard]>=0.41.0",
     "python-dotenv>=1.2.1",

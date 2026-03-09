@@ -61,5 +61,77 @@
         "stock": 3,
         "warehouse": "Manchester",
         "reorder_threshold": 15
+    },
+    {
+        "sku": "LP-8010",
+        "name": "Laptop Stand",
+        "category": "accessories",
+        "price_gbp": 44.99,
+        "stock": 156,
+        "warehouse": "London",
+        "reorder_threshold": 30
+    },
+    {
+        "sku": "MS-9002",
+        "name": "Wireless Mouse",
+        "category": "electronics",
+        "price_gbp": 34.99,
+        "stock": 0,
+        "warehouse": "London",
+        "reorder_threshold": 40
+    },
+    {
+        "sku": "PP-1050",
+        "name": "Ballpoint Pen Box (50)",
+        "category": "stationery",
+        "price_gbp": 18.50,
+        "stock": 340,
+        "warehouse": "Manchester",
+        "reorder_threshold": 80
+    },
+    {
+        "sku": "WB-2010",
+        "name": "Whiteboard 120x90cm",
+        "category": "furniture",
+        "price_gbp": 89.00,
+        "stock": 22,
+        "warehouse": "Manchester",
+        "reorder_threshold": 5
+    },
+    {
+        "sku": "UH-3305",
+        "name": "USB-C Hub 7-Port",
+        "category": "electronics",
+        "price_gbp": 42.99,
+        "stock": 64,
+        "warehouse": "London",
+        "reorder_threshold": 25
+    },
+    {
+        "sku": "DL-4400",
+        "name": "Desk Lamp LED",
+        "category": "accessories",
+        "price_gbp": 37.50,
+        "stock": 91,
+        "warehouse": "Manchester",
+        "reorder_threshold": 20
+    },
+    {
+        "sku": "FC-5500",
+        "name": "Filing Cabinet 3-Drawer",
+        "category": "furniture",
+        "price_gbp": 189.00,
+        "stock": 8,
+        "warehouse": "London",
+        "reorder_threshold": 3
+    },
+    {
+        "sku": "PT-6600",
+        "name": "Printer Paper A4 (5 Reams)",
+        "category": "stationery",
+        "price_gbp": 24.99,
+        "stock": 0,
+        "warehouse": "Manchester",
+        "reorder_threshold": 50
     }
 ]

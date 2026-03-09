@@ -1,7 +1,7 @@
 [project]
-name = "halohttp"
+name = "halo-fastapi"
 version = "0.0.1"
-description = "HALO — HTTP API Language for Operations. Self-describing APIs for LLM agents without MCP."
+description = "HALO — HTTP API Language for Operations. FastAPI plugin for self-describing APIs for LLM agents."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
@@ -16,4 +16,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/halohttp"]
+packages = ["src/halo_fastapi"]

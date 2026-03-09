@@ -45,5 +45,14 @@ class WeatherResponse(pydantic.BaseModel):
     temperature_c: float = pydantic.Field(..., description="Current temperature in degrees Celsius")
     humidity_pct: int = pydantic.Field(..., description="Relative humidity as a percentage (0-100)")
     wind_kph: float = pydantic.Field(..., description="Wind speed in kilometres per hour")
-    condition: Literal["sunny", "partly_cloudy", "overcast", "rain", "humid"] = pydantic.Field(..., description="Current weather condition")
+    condition: Literal[
+        "sunny",
+        "partly_cloudy",
+        "overcast",
+        "rain",
+        "humid",
+        "snow",
+        "thunderstorm",
+        "windy",
+    ] = pydantic.Field(..., description="Current weather condition")
     forecast: str = pydantic.Field(..., description="Natural-language forecast summary for the day")

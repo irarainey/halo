@@ -8,9 +8,9 @@ prerelease-mode = "allow"
 [manifest]
 members = [
     "halo",
-    "halo-sample-agent",
+    "halo-fastapi",
+    "halo-sample-agents",
     "halo-sample-api",
-    "halohttp",
 ]
 
 [[package]]
@@ -33,6 +33,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/65/bb/694946d7a4d266e87a74352fb62f66b790f56325d34a5d20c1760d8e5613/agent_framework_core-1.0.0rc2.tar.gz", hash = "sha256:2dd38775c9274e448485aaf2aca064f4bbaa0248650ee65535c9495e1eefd9f0", size = 275391, upload-time = "2026-02-26T01:22:52.168Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0a/65/9b7710b3d1662b1a4ddc5155ecee4099d4bf7723a5e8c8818b7d612dae03/agent_framework_core-1.0.0rc2-py3-none-any.whl", hash = "sha256:71293776a29360620924663338816151226bfa06d1793148f39f23e0d74964db", size = 321597, upload-time = "2026-02-26T01:23:18.478Z" },
+]
+
+[[package]]
+name = "agent-framework-devui"
+version = "1.0.0b260225"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "agent-framework-core" },
+    { name = "fastapi" },
+    { name = "python-dotenv" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a0/70/eb98c4204c4e4f617c8f1817263afb4691d53f613e68ba63004f74879696/agent_framework_devui-1.0.0b260225.tar.gz", hash = "sha256:dc305ff55f9811aef01437968741f50f006c7618b1d5eafd34968f05c6089145", size = 355604, upload-time = "2026-02-26T01:22:57.407Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/e7/84b4d6b8c267019af8be169fe9182068c19d5edae63cda954066d93f5240/agent_framework_devui-1.0.0b260225-py3-none-any.whl", hash = "sha256:05a00f51285bb1496cf60e4a6985832f16df7f5699d8a9852514ff5f961355ba", size = 360478, upload-time = "2026-02-26T01:23:23.236Z" },
 ]
 
 [[package]]
@@ -504,9 +519,9 @@ name = "halo"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
-    { name = "halo-sample-agent" },
+    { name = "halo-fastapi" },
+    { name = "halo-sample-agents" },
     { name = "halo-sample-api" },
-    { name = "halohttp" },
 ]
 
 [package.dev-dependencies]
@@ -520,9 +535,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "halo-sample-agent", editable = "sample-agent" },
+    { name = "halo-fastapi", editable = "halo-fastapi" },
+    { name = "halo-sample-agents", editable = "sample-agents" },
     { name = "halo-sample-api", editable = "sample-api" },
-    { name = "halohttp", editable = "halohttp" },
 ]
 
 [package.metadata.requires-dev]
@@ -535,49 +550,9 @@ dev = [
 ]
 
 [[package]]
-name = "halo-sample-agent"
+name = "halo-fastapi"
 version = "0.0.1"
-source = { editable = "sample-agent" }
-dependencies = [
-    { name = "agent-framework-core" },
-    { name = "halohttp" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agent-framework-core", specifier = "==1.0.0rc2" },
-    { name = "halohttp", editable = "halohttp" },
-    { name = "pydantic-settings", specifier = ">=2.13.1" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-]
-
-[[package]]
-name = "halo-sample-api"
-version = "0.0.1"
-source = { editable = "sample-api" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "halohttp" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.129.0" },
-    { name = "halohttp", editable = "halohttp" },
-    { name = "pydantic-settings", specifier = ">=2.13.1" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.41.0" },
-]
-
-[[package]]
-name = "halohttp"
-version = "0.0.1"
-source = { editable = "halohttp" }
+source = { editable = "halo-fastapi" }
 dependencies = [
     { name = "aiohttp" },
     { name = "fastapi" },
@@ -589,6 +564,48 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "fastapi", specifier = ">=0.129.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
+]
+
+[[package]]
+name = "halo-sample-agents"
+version = "0.0.1"
+source = { editable = "sample-agents" }
+dependencies = [
+    { name = "agent-framework-core" },
+    { name = "agent-framework-devui" },
+    { name = "halo-fastapi" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agent-framework-core", specifier = "==1.0.0rc2" },
+    { name = "agent-framework-devui", specifier = ">=1.0.0b260225" },
+    { name = "halo-fastapi", editable = "halo-fastapi" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+]
+
+[[package]]
+name = "halo-sample-api"
+version = "0.0.1"
+source = { editable = "sample-api" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "halo-fastapi" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.129.0" },
+    { name = "halo-fastapi", editable = "halo-fastapi" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.41.0" },
 ]
 
 [[package]]

@@ -6,9 +6,9 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
-    "halohttp",
+    "halo-fastapi",
     "halo-sample-api",
-    "halo-sample-agent",
+    "halo-sample-agents",
 ]
 
 [dependency-groups]
@@ -24,12 +24,12 @@ dev = [
 prerelease = "allow"
 
 [tool.uv.workspace]
-members = ["halohttp", "sample-api", "sample-agent"]
+members = ["halo-fastapi", "sample-api", "sample-agents"]
 
 [tool.uv.sources]
-halohttp = { workspace = true }
+halo-fastapi = { workspace = true }
 halo-sample-api = { workspace = true }
-halo-sample-agent = { workspace = true }
+halo-sample-agents = { workspace = true }
 
 # ── Poe tasks ───────────────────────────────────────────────────
 
@@ -42,19 +42,19 @@ sequence = ["lint:ruff", "lint:mypy"]
 [tool.poe.tasks."lint:ruff"]
 help = "Run ruff linter and formatter check"
 sequence = [
-    { cmd = "ruff check halohttp/ sample-api/ sample-agent/" },
-    { cmd = "ruff format --check halohttp/ sample-api/ sample-agent/" },
+    { cmd = "ruff check halo-fastapi/ sample-api/ sample-agents/" },
+    { cmd = "ruff format --check halo-fastapi/ sample-api/ sample-agents/" },
 ]
 
 [tool.poe.tasks."lint:mypy"]
 help = "Run mypy type checking"
-cmd = "mypy halohttp/ sample-api/ sample-agent/"
+cmd = "mypy halo-fastapi/ sample-api/ sample-agents/"
 
 [tool.poe.tasks.format]
 help = "Auto-fix ruff lint issues and format code"
 sequence = [
-    { cmd = "ruff check --fix halohttp/ sample-api/ sample-agent/" },
-    { cmd = "ruff format halohttp/ sample-api/ sample-agent/" },
+    { cmd = "ruff check --fix halo-fastapi/ sample-api/ sample-agents/" },
+    { cmd = "ruff format halo-fastapi/ sample-api/ sample-agents/" },
 ]
 
 [tool.poe.tasks.test]
@@ -66,7 +66,7 @@ cmd = "pytest tests/ -v"
 [tool.ruff]
 target-version = "py313"
 line-length = 140
-src = ["halohttp/src", "sample-api/src", "sample-agent/src"]
+src = ["halo-fastapi/src", "sample-api/src", "sample-agents/src"]
 
 [tool.ruff.lint]
 select = [
@@ -85,7 +85,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["halohttp", "sample_api", "sample_agent"]
+known-first-party = ["halo_fastapi", "sample_api", "sample_agent"]
 
 # ── Pytest ──────────────────────────────────────────────────────
 
@@ -97,8 +97,9 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.13"
-mypy_path = ["halohttp/src", "sample-api/src", "sample-agent/src"]
-packages = ["halohttp", "sample_api", "sample_agent"]
+mypy_path = ["halo-fastapi/src", "sample-api/src", "sample-agents/src"]
+packages = ["halo_fastapi", "sample_api", "sample_agent"]
+plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true

@@ -1,16 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 import pydantic
+
+
+def _to_lower(value: Any) -> Any:
+    """Normalise string input to lowercase for case-insensitive Literal matching."""
+    return value.lower() if isinstance(value, str) else value
 
 
 class InventoryRequest(pydantic.BaseModel):
     """Request body for the inventory check endpoint. Supports category and low-stock filters."""
 
-    category: Literal["electronics", "furniture", "stationery"] | None = pydantic.Field(
-        None, description="Optional product category to filter by"
-    )
+    category: Annotated[
+        Literal["electronics", "furniture", "stationery", "accessories"] | None,
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field(None, description="Optional product category to filter by")
     low_stock_only: bool = pydantic.Field(False, description="When true, return only items at or below their reorder threshold")
 
     model_config = pydantic.ConfigDict(

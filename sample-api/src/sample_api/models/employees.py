@@ -1,14 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 import pydantic
+
+
+def _to_lower(value: Any) -> Any:
+    """Normalise string input to lowercase for case-insensitive Literal matching."""
+    return value.lower() if isinstance(value, str) else value
 
 
 class EmployeeLookupRequest(pydantic.BaseModel):
     """Request body for the employee directory lookup. Supports department and office filters."""
 
-    department: Literal["engineering", "marketing", "finance", "hr"] | None = pydantic.Field(None, description="Optional department filter")
+    department: Annotated[
+        Literal["engineering", "marketing", "finance", "hr", "design", "sales"] | None,
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field(None, description="Optional department filter")
     office: str | None = pydantic.Field(None, description="Optional office location filter, e.g. 'London', 'Berlin'")
 
     model_config = pydantic.ConfigDict(

@@ -1,0 +1,9 @@
+{
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.diagnosticSeverityOverrides": {},
+    "python.analysis.extraPaths": [
+        "halo-fastapi/src",
+        "sample-api/src",
+        "sample-agents/src"
+    ]
+}

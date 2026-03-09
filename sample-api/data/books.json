@@ -58,5 +58,95 @@
         "pages": 560,
         "rating": 4.3,
         "summary": "A framework for making design decisions and a vocabulary for discussing design in the context of complex software systems aligned with business domains."
+    },
+    {
+        "isbn": "978-0-06-093546-7",
+        "title": "To Kill a Kingdom",
+        "author": "Alexandra Christo",
+        "genre": "fiction",
+        "year": 2018,
+        "pages": 352,
+        "rating": 3.9,
+        "summary": "A dark fantasy retelling of The Little Mermaid where a siren princess who collects the hearts of princes meets a prince determined to destroy her."
+    },
+    {
+        "isbn": "978-0-13-235088-4",
+        "title": "Clean Code",
+        "author": "Robert C. Martin",
+        "genre": "technology",
+        "year": 2008,
+        "pages": 464,
+        "rating": 4.4,
+        "summary": "A handbook of agile software craftsmanship presenting principles, patterns, and practices of writing clean, readable, and maintainable code."
+    },
+    {
+        "isbn": "978-0-316-76948-0",
+        "title": "The Catcher in the Rye",
+        "author": "J.D. Salinger",
+        "genre": "fiction",
+        "year": 1951,
+        "pages": 234,
+        "rating": 3.8,
+        "summary": "A coming-of-age story narrated by teenager Holden Caulfield as he wanders New York City after being expelled from prep school."
+    },
+    {
+        "isbn": "978-0-06-112241-5",
+        "title": "Thinking, Fast and Slow",
+        "author": "Daniel Kahneman",
+        "genre": "non-fiction",
+        "year": 2011,
+        "pages": 499,
+        "rating": 4.5,
+        "summary": "An exploration of the two systems that drive the way we think—fast intuitive thinking and slow deliberate thinking—and how they shape our judgements and decisions."
+    },
+    {
+        "isbn": "978-0-201-63361-0",
+        "title": "Design Patterns",
+        "author": "Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides",
+        "genre": "technology",
+        "year": 1994,
+        "pages": 416,
+        "rating": 4.2,
+        "summary": "The classic catalogue of 23 object-oriented design patterns that provide reusable solutions to common software design problems."
+    },
+    {
+        "isbn": "978-0-06-024902-4",
+        "title": "A Short History of Nearly Everything",
+        "author": "Bill Bryson",
+        "genre": "non-fiction",
+        "year": 2003,
+        "pages": 544,
+        "rating": 4.6,
+        "summary": "An accessible and entertaining journey through the story of science, from the Big Bang to the rise of civilisation, explaining complex concepts in plain language."
+    },
+    {
+        "isbn": "978-0-14-118776-1",
+        "title": "One Hundred Years of Solitude",
+        "author": "Gabriel García Márquez",
+        "genre": "fiction",
+        "year": 1967,
+        "pages": 417,
+        "rating": 4.6,
+        "summary": "A sweeping multi-generational saga of the Buendía family in the fictional town of Macondo, blending magical realism with Colombian history."
+    },
+    {
+        "isbn": "978-1-49-195019-4",
+        "title": "Designing Data-Intensive Applications",
+        "author": "Martin Kleppmann",
+        "genre": "technology",
+        "year": 2017,
+        "pages": 616,
+        "rating": 4.8,
+        "summary": "A comprehensive guide to the principles and practicalities of data systems, covering databases, stream processing, batch processing, and distributed architectures."
+    },
+    {
+        "isbn": "978-0-14-028329-1",
+        "title": "Brave New World",
+        "author": "Aldous Huxley",
+        "genre": "fiction",
+        "year": 1932,
+        "pages": 311,
+        "rating": 4.3,
+        "summary": "A dystopian novel set in a future World State where citizens are genetically engineered, socially conditioned, and pacified by a pleasure drug called soma."
     }
 ]

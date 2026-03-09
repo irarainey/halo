@@ -8,5 +8,6 @@ class Settings(pydantic_settings.BaseSettings):
     app_version: str = "0.1.0"
     host: str = "0.0.0.0"
     port: int = 3001
+    log_level: str = "INFO"
 
     model_config = {"env_prefix": "SAMPLE_API_"}

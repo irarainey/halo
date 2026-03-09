@@ -61,5 +61,86 @@
         "role": "Data Scientist",
         "office": "Tokyo",
         "start_date": "2023-02-28"
+    },
+    {
+        "employee_id": "EMP-008",
+        "name": "Hassan Ali",
+        "email": "hassan.ali@example.com",
+        "department": "engineering",
+        "role": "DevOps Engineer",
+        "office": "London",
+        "start_date": "2021-05-10"
+    },
+    {
+        "employee_id": "EMP-009",
+        "name": "Isabella Rossi",
+        "email": "isabella.rossi@example.com",
+        "department": "design",
+        "role": "UX Designer",
+        "office": "Berlin",
+        "start_date": "2022-08-01"
+    },
+    {
+        "employee_id": "EMP-010",
+        "name": "James O'Brien",
+        "email": "james.obrien@example.com",
+        "department": "sales",
+        "role": "Account Executive",
+        "office": "New York",
+        "start_date": "2020-11-20"
+    },
+    {
+        "employee_id": "EMP-011",
+        "name": "Keiko Nakamura",
+        "email": "keiko.nakamura@example.com",
+        "department": "engineering",
+        "role": "QA Engineer",
+        "office": "Tokyo",
+        "start_date": "2023-06-12"
+    },
+    {
+        "employee_id": "EMP-012",
+        "name": "Liam Patel",
+        "email": "liam.patel@example.com",
+        "department": "finance",
+        "role": "Finance Manager",
+        "office": "London",
+        "start_date": "2017-09-04"
+    },
+    {
+        "employee_id": "EMP-013",
+        "name": "Maria Gonzalez",
+        "email": "maria.gonzalez@example.com",
+        "department": "marketing",
+        "role": "Content Strategist",
+        "office": "New York",
+        "start_date": "2021-03-22"
+    },
+    {
+        "employee_id": "EMP-014",
+        "name": "Nils Bergström",
+        "email": "nils.bergstrom@example.com",
+        "department": "engineering",
+        "role": "Security Engineer",
+        "office": "Berlin",
+        "start_date": "2022-01-17"
+    },
+    {
+        "employee_id": "EMP-015",
+        "name": "Olivia Clarke",
+        "email": "olivia.clarke@example.com",
+        "department": "hr",
+        "role": "Talent Acquisition Specialist",
+        "office": "London",
+        "start_date": "2023-09-05"
+    },
+    {
+        "employee_id": "EMP-016",
+        "name": "Priya Sharma",
+        "email": "priya.sharma@example.com",
+        "department": "sales",
+        "role": "Sales Director",
+        "office": "London",
+        "start_date": "2018-06-18"
     }
 ]

@@ -1,14 +1,15 @@
 [project]
-name = "halo-sample-agent"
+name = "halo-sample-agents"
 version = "0.0.1"
 description = "Sample LLM agent application that consumes a HALO-compliant API using Agent Framework."
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
-    "halohttp",
+    "halo-fastapi",
     "agent-framework-core==1.0.0rc2",
     "python-dotenv>=1.2.1",
     "pydantic-settings>=2.13.1",
+    "agent-framework-devui>=1.0.0b260225",
 ]
 
 [build-system]

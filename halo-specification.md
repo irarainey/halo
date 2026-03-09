@@ -11,7 +11,7 @@
 ## Licence
 
 Protocol Specification: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-Reference Implementation (`halohttp`): [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+Reference Implementation (`halo-fastapi`): [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 ---
 
@@ -144,7 +144,7 @@ Servers that do not implement HALO return a 406 or their standard OPTIONS respon
 
 ### 3.1 Root Discovery
 
-A single OPTIONS request to the base URL returns a manifest of all available endpoints including their tags:
+A single OPTIONS request to the base URL returns a manifest of all available endpoints including their name, description, and tags:
 
 ```http
 OPTIONS / HTTP/1.1
@@ -157,11 +157,11 @@ Accept: application/llm+json
   "api": "Example Payments API",
   "version": "2.1.0",
   "tools": [
-    { "url": "/api/payments/charge",   "tags": ["payments", "write"] },
-    { "url": "/api/payments/refund",   "tags": ["payments", "write"] },
-    { "url": "/api/customers/lookup",  "tags": ["customers", "read"] },
-    { "url": "/api/email/send",        "tags": ["comms", "write"] },
-    { "url": "/api/admin/users",       "tags": ["admin", "write"] }
+    { "url": "/api/payments/charge",   "name": "charge",  "description": "Charge a payment method",          "tags": ["payments", "write"] },
+    { "url": "/api/payments/refund",   "name": "refund",  "description": "Refund a previous charge",          "tags": ["payments", "write"] },
+    { "url": "/api/customers/lookup",  "name": "lookup",  "description": "Look up customer details",           "tags": ["customers", "read"] },
+    { "url": "/api/email/send",        "name": "send",    "description": "Send an email to a recipient",       "tags": ["comms", "write"] },
+    { "url": "/api/admin/users",       "name": "users",   "description": "Manage admin user accounts",         "tags": ["admin", "write"] }
   ]
 }
 ```
@@ -211,13 +211,15 @@ When credentials are passed with the root OPTIONS request, the manifest reflects
 
 ```json
 // Read-only token:
-{ "tools": [{ "url": "/api/customers/lookup", "tags": ["customers","read"] }] }
+{ "tools": [
+  { "url": "/api/customers/lookup", "name": "lookup", "description": "Look up customer details", "tags": ["customers","read"] }
+] }
 
 // Full-access token:
 { "tools": [
-  { "url": "/api/payments/charge",  "tags": ["payments","write"] },
-  { "url": "/api/customers/lookup", "tags": ["customers","read"] },
-  { "url": "/api/admin/users",      "tags": ["admin","write"] }
+  { "url": "/api/payments/charge",  "name": "charge", "description": "Charge a payment method",   "tags": ["payments","write"] },
+  { "url": "/api/customers/lookup", "name": "lookup", "description": "Look up customer details",  "tags": ["customers","read"] },
+  { "url": "/api/admin/users",      "name": "users",  "description": "Manage admin user accounts", "tags": ["admin","write"] }
 ] }
 ```
 
@@ -228,7 +230,7 @@ The LLM never learns that restricted tools exist.
 ```
 Agent starts
    │
-   ├── OPTIONS /?tags=payments     ← cheap — just names and tags
+   ├── OPTIONS /?tags=payments     ← cheap — names, descriptions, and tags
    │   ← { tools: [charge, refund] }
    │
    │   LLM receives: "Charge customer £25"
@@ -302,7 +304,7 @@ The LLM never handles secrets directly — it decides what to call, the runtime 
 
 Any HALO implementation — regardless of language — needs to map the protocol's schema fields to the tool primitive of the target agent framework. The core adapter logic is always the same three steps: discover via `OPTIONS /`, fetch schema via `OPTIONS /route`, invoke via the real HTTP verb. The wrapping layer is the only thing that varies per framework.
 
-> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language.
+> **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. These examples illustrate the target integration pattern — the specific adapter classes shown (`HttpDiscoveryToolkit`, `HttpToolPlugin`, `HttpToolLoader`) are not yet implemented in `halo-fastapi`. The current reference implementation provides `HttpPlugin` with discovery, schema caching, and invocation; framework-specific tool conversion is handled in application code (see the sample agent for a working example with Microsoft Agent Framework).
 
 ### 5.1 Semantic Kernel
 
@@ -334,7 +336,7 @@ result = await executor.ainvoke({'input': 'Charge customer £25'})
 
 ```python
 from azure.ai.projects import AIProjectClient
-from halohttp import HttpToolPlugin
+from halo_fastapi import HttpToolPlugin
 
 client = AIProjectClient.from_connection_string(
     conn_str=os.environ['PROJECT_CONNECTION_STRING'],
@@ -363,7 +365,7 @@ run = client.agents.create_and_process_run(thread.id, agent.id)
 
 ```python
 from llama_index.core.agent import ReActAgent
-from halohttp import HttpToolLoader
+from halo_fastapi import HttpToolLoader
 
 loader = HttpToolLoader(
     base_url='https://api.example.com',
@@ -508,7 +510,7 @@ Because the schema lives on an HTTP endpoint it can be validated in CI:
 
 ```bash
 curl -X OPTIONS https://api.example.com/payments/charge \
-     -H 'Accept: application/llm+json' | halohttp validate
+     -H 'Accept: application/llm+json' | halo-fastapi validate
 ```
 
 Catch drift before it reaches production. A static JSON file in a repository has no equivalent.
@@ -597,34 +599,34 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 
 # PART II — The Python Reference Implementation
 
-*`halohttp` — a FastAPI plugin and agent adapter package implementing the HALO protocol*
+*`halo-fastapi` — a FastAPI plugin and agent adapter package implementing the HALO protocol*
 
 ---
 
-## 11. halohttp: Server-Side Implementation
+## 11. halo-fastapi: Server-Side Implementation
 
 ### 11.1 Overview
 
-`halohttp` is a PyPI package that implements the HALO protocol for FastAPI servers. It is one implementation of the protocol — the same convention could be implemented as a Django Ninja plugin, a Flask extension, a Rails gem, or an Express middleware. `halohttp` is the Python reference implementation.
+`halo-fastapi` is a PyPI package that implements the HALO protocol for FastAPI servers. It is one implementation of the protocol — the same convention could be implemented as a Django Ninja plugin, a Flask extension, a Rails gem, or an Express middleware. `halo-fastapi` is the Python reference implementation.
 
 ```bash
-uv add halohttp
+uv add halo-fastapi
 ```
 
 The package exposes two primary objects:
 
-- **`LLMSchema`** — the server-side FastAPI plugin
+- **`HaloDiscovery`** — the server-side FastAPI plugin
 - **`HttpPlugin`** — the client-side agent adapter
 
-Together they are the complete HALO integration: `LLMSchema` makes an API HALO-compliant, `HttpPlugin` makes an agent capable of consuming any HALO-compliant API.
+Together they are the complete HALO integration: `HaloDiscovery` makes an API HALO-compliant, `HttpPlugin` makes an agent capable of consuming any HALO-compliant API.
 
-### 11.2 The LLMSchema Plugin
+### 11.2 The HaloDiscovery Plugin
 
 A single line added to any FastAPI application makes every route HALO-compliant. The plugin introspects the existing application at startup and derives everything it needs from metadata that already exists. No routes change. No models change. No decorators are required.
 
-### 11.3 What LLMSchema(app) Actually Does
+### 11.3 What HaloDiscovery(app) Actually Does
 
-When `LLMSchema(app)` is called at startup, it performs the following steps automatically:
+When `HaloDiscovery(app)` is called at startup, it performs the following steps automatically:
 
 #### Step 1 — Route Introspection
 
@@ -719,7 +721,12 @@ def register_options_handlers(app, schemas: dict):
         return JSONResponse({
             'api':     app.title,
             'version': app.version,
-            'tools':   [{'url': url, 'tags': s.get('tags',[])} for url,s in visible.items()]
+            'tools':   [{
+            'url': url,
+            'name': url.strip('/').split('/')[-1],
+            'description': s.get('description', ''),
+            'tags': s.get('tags', []),
+        } for url, s in visible.items()]
         })
 
     # Per-route handler for each registered endpoint
@@ -733,21 +740,21 @@ def register_options_handlers(app, schemas: dict):
         make_handler(schema)
 ```
 
-> **The complete picture:** `LLMSchema(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
+> **The complete picture:** `HaloDiscovery(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
 
 ### 11.4 Complete Server Example
 
 The example below is annotated to show exactly where each HALO field comes from. Tags and the tool description are the two fields most commonly misunderstood.
 
 ```python
-from halohttp import LLMSchema
+from halo_fastapi import HaloDiscovery
 from fastapi import FastAPI, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal
 
 app = FastAPI(title='Payments API', version='1.0.0')
-LLMSchema(app)  # ← registers OPTIONS handlers for every route at startup
+HaloDiscovery(app)  # ← registers OPTIONS handlers for every route at startup
 
 
 class ChargeResponse(BaseModel):
@@ -811,7 +818,7 @@ async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
 
 > **Tags rule:** Tags are the single most impactful field for agent performance. They determine which agents discover the tool at all. At minimum, every endpoint should have a domain tag (`payments`, `email`, `calendar`) and a `read`/`write` tag. Without tags, the tool appears in all discovery requests regardless of relevance.
 
-### 11.5 What halohttp Derives Automatically
+### 11.5 What halo-fastapi Derives Automatically
 
 | Field | Source |
 |---|---|
@@ -830,7 +837,7 @@ async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
 
 ### 11.6 Implementing HALO in Other Languages
 
-The following are minimal reference implementations showing that the protocol requires no special library — any HTTP server can implement it by adding a single OPTIONS handler per route. `halohttp` automates this for FastAPI; these examples show the manual equivalent.
+The following are minimal reference implementations showing that the protocol requires no special library — any HTTP server can implement it by adding a single OPTIONS handler per route. `halo-fastapi` automates this for FastAPI; these examples show the manual equivalent.
 
 #### Node.js / Express
 
@@ -870,14 +877,14 @@ For teams with existing OpenAPI specs, a bridge auto-generates `application/llm+
 
 ---
 
-## 12. halohttp: Client-Side Agent Adapter
+## 12. halo-fastapi: Client-Side Agent Adapter
 
-The same `halohttp` package provides `HttpPlugin` — the client-side adapter that consumes any HALO-compliant API and registers its tools with a Python agent framework.
+The same `halo-fastapi` package provides `HttpPlugin` — the client-side HTTP adapter that discovers any HALO-compliant API, caches schemas, injects credentials, and invokes tools directly.
 
 ### 12.1 HttpPlugin Core
 
 ```python
-from halohttp import HttpPlugin
+from halo_fastapi import HttpPlugin
 
 plugin = HttpPlugin(
     base_url='https://api.example.com',
@@ -891,45 +898,71 @@ await plugin.discover()                    # all tools
 await plugin.discover(tags=['payments'])   # filtered
 
 # Schemas are cached — OPTIONS only fired once per route per session
-tool = await plugin.get_tool('/api/payments/charge')
+schema = await plugin.get_tool('/api/payments/charge')
+
+# Invoke a tool directly — credentials injected automatically
+result = await plugin.invoke('/api/payments/charge', body={'amount': 1000})
 ```
 
 ### 12.2 What HttpPlugin Does Internally
 
 When `discover()` is called, `HttpPlugin` performs the following sequence:
 
-1. Fires `OPTIONS /` with `Accept: application/llm+json` — receives the root manifest with tool URLs and tags
-2. Filters the manifest by requested tags if provided
-3. Registers stub tool objects for each URL in the filtered list — lightweight placeholders
-4. On first invocation of any stub, fires `OPTIONS /route` to fetch the full schema and caches it
-5. Injects credentials from the credential map based on the target domain
-6. Constructs and fires the real HTTP call using the method and URL from the schema
+1. Fires `OPTIONS /` with `Accept: application/llm+json` — receives the root manifest with tool URLs, names, descriptions, and tags
+2. If tags were requested, the query `?tags=tag1,tag2` is appended and server-side filtering applies
+3. Stores the tool list from the manifest as `plugin.tools`
+4. On `get_tool(path)`, fires `OPTIONS /route` to fetch the full schema and caches it
+5. On `invoke(path, body)`, fetches the schema (cached), injects credentials from the credential map based on the target domain, and fires the real HTTP call using the method and URL from the schema
+6. Failed requests are retried with exponential backoff on connection errors, HTTP 429, and 5xx responses
 
-### 12.3 Framework Adapters
+### 12.3 Credential Injection
+
+`HttpPlugin` accepts a credential map keyed by domain (with optional port):
 
 ```python
-from halohttp import HttpPlugin
-
-plugin = await HttpPlugin(base_url, credentials).discover(tags=['payments'])
-
-# Semantic Kernel
-kernel.add_plugin(plugin.to_semantic_kernel())
-
-# LangChain
-tools = plugin.to_langchain()          # returns list[BaseTool]
-
-# LlamaIndex
-tools = plugin.to_llama_index()        # returns list[FunctionTool]
-
-# Microsoft Agent Framework
-tools     = plugin.to_azure_tools()
-resources = plugin.to_azure_resources()
-
-# Raw — for custom frameworks or direct use
-schemas = plugin.schemas               # dict of url -> halo schema
+credentials = {
+    'api.example.com':      {'type': 'bearer', 'value': os.getenv('API_KEY')},
+    'api.internal.com:8443': {'type': 'apikey', 'header': 'X-API-Key', 'value': os.getenv('INTERNAL_KEY')},
+}
 ```
 
-> **Package boundary:** `halohttp` is one implementation of the HALO protocol. A developer building a Node.js agent would use a separate `halohttp-node` package that performs identical OPTIONS calls and maps the same schema fields to its framework primitives. The protocol is the contract. The packages are convenient implementations of that contract.
+Supported credential types:
+
+| Type | Behaviour |
+|---|---|
+| `bearer` | Injects `Authorization: Bearer {value}` |
+| `apikey` | Injects the value into the named header (default `X-API-Key`) |
+| `basic` | Injects `Authorization: Basic {value}` |
+
+### 12.4 Framework Integration
+
+`HttpPlugin` provides discovery, schema caching, and invocation. To use discovered tools with a specific agent framework, convert HALO schemas to the framework's tool primitive. The sample agent in this repository demonstrates this with Microsoft Agent Framework:
+
+```python
+from agent_framework import FunctionTool
+from halo_fastapi import HttpPlugin
+
+plugin = await HttpPlugin(base_url, credentials).discover()
+
+tools = []
+for entry in plugin.tools:
+    schema = await plugin.get_tool(entry.url)
+    path = entry.url
+
+    async def invoke(path=path, **kwargs):
+        return await plugin.invoke(path, body=kwargs)
+
+    tools.append(FunctionTool(
+        name=entry.name,
+        description=schema.why or schema.description,
+        func=invoke,
+        input_model=build_input_model(schema),  # convert HALO input fields to JSON Schema
+    ))
+```
+
+The same pattern applies to any framework — Semantic Kernel, LangChain, LlamaIndex — by wrapping `plugin.invoke()` in the framework's tool primitive.
+
+> **Package boundary:** `halo-fastapi` is one implementation of the HALO protocol. A developer building a Node.js agent would use a separate `halo-node` package that performs identical OPTIONS calls and maps the same schema fields to its framework primitives. The protocol is the contract. The packages are convenient implementations of that contract.
 
 ---
 
@@ -939,15 +972,15 @@ schemas = plugin.schemas               # dict of url -> halo schema
 
 1. Define `application/llm+json` schema as a JSON Schema document and publish to GitHub with CC BY 4.0
 2. Build TypeScript reference client: OPTIONS discovery, tag filtering, schema fetch, safe call
-3. Build `halohttp` FastAPI plugin — auto-derives schema from Pydantic models and route metadata (Apache 2.0)
+3. Build `halo-fastapi` FastAPI plugin — auto-derives schema from Pydantic models and route metadata (Apache 2.0)
 4. Build Express.js middleware equivalent
 
 ### Phase 2 — Validation and Tooling (Week 3–4)
 
-1. CLI validator: `halohttp validate <url>`
+1. CLI validator: `halo-fastapi validate <url>`
 2. OpenAPI bridge: auto-generate `application/llm+json` from existing OpenAPI specs
 3. CI test suite covering auth types, discovery, tag filtering, side effects, and chaining
-4. Publish `halohttp` to PyPI via `uv`
+4. Publish `halo-fastapi` to PyPI via `uv`
 
 ### Phase 3 — Framework Adapters (Month 2)
 
@@ -996,5 +1029,5 @@ One OPTIONS handler · Self-describing APIs · Tag-filtered discovery · Auth-aw
 ---
 
 *HALO Protocol Specification — CC BY 4.0*
-*halohttp Reference Implementation — Apache 2.0*
+*halo-fastapi Reference Implementation — Apache 2.0*
 *https://github.com/irarainey/halo*

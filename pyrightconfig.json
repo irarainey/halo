@@ -1,0 +1,18 @@
+{
+    "pythonVersion": "3.13",
+    "pythonPlatform": "Linux",
+    "executionEnvironments": [
+        {
+            "root": "halo-fastapi/src",
+            "extraPaths": []
+        },
+        {
+            "root": "sample-api/src",
+            "extraPaths": ["halo-fastapi/src"]
+        },
+        {
+            "root": "sample-agents/src",
+            "extraPaths": ["halo-fastapi/src"]
+        }
+    ]
+}

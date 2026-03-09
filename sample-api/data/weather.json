@@ -52,5 +52,86 @@
         "wind_kph": 8.0,
         "condition": "humid",
         "forecast": "Hot and humid with hazy sunshine. Slight chance of isolated thunderstorms in the evening."
+    },
+    {
+        "city": "Paris",
+        "country": "FR",
+        "temperature_c": 14.0,
+        "humidity_pct": 68,
+        "wind_kph": 12.0,
+        "condition": "partly_cloudy",
+        "forecast": "Mild with broken cloud. Dry conditions expected with sun appearing through the afternoon."
+    },
+    {
+        "city": "Toronto",
+        "country": "CA",
+        "temperature_c": -3.5,
+        "humidity_pct": 72,
+        "wind_kph": 25.0,
+        "condition": "snow",
+        "forecast": "Light snow showers throughout the morning easing by midday. Wind chill making it feel much colder."
+    },
+    {
+        "city": "Dubai",
+        "country": "AE",
+        "temperature_c": 38.0,
+        "humidity_pct": 45,
+        "wind_kph": 14.0,
+        "condition": "sunny",
+        "forecast": "Extreme heat with clear skies. Stay hydrated and avoid prolonged outdoor exposure during midday."
+    },
+    {
+        "city": "São Paulo",
+        "country": "BR",
+        "temperature_c": 24.5,
+        "humidity_pct": 75,
+        "wind_kph": 11.0,
+        "condition": "thunderstorm",
+        "forecast": "Afternoon thunderstorms expected with heavy downpours. Clearing overnight with cooler temperatures."
+    },
+    {
+        "city": "Cape Town",
+        "country": "ZA",
+        "temperature_c": 22.0,
+        "humidity_pct": 58,
+        "wind_kph": 28.0,
+        "condition": "windy",
+        "forecast": "Strong south-easterly winds with clear skies. Warm but blustery conditions persisting all day."
+    },
+    {
+        "city": "Singapore",
+        "country": "SG",
+        "temperature_c": 30.5,
+        "humidity_pct": 88,
+        "wind_kph": 6.0,
+        "condition": "humid",
+        "forecast": "Oppressively humid with intermittent showers. Thunderstorm risk increasing toward evening."
+    },
+    {
+        "city": "Reykjavik",
+        "country": "IS",
+        "temperature_c": 1.0,
+        "humidity_pct": 90,
+        "wind_kph": 40.0,
+        "condition": "overcast",
+        "forecast": "Grey skies with biting wind. Sleet possible in exposed areas. Temperatures barely above freezing."
+    },
+    {
+        "city": "Nairobi",
+        "country": "KE",
+        "temperature_c": 20.0,
+        "humidity_pct": 60,
+        "wind_kph": 9.0,
+        "condition": "sunny",
+        "forecast": "Pleasant and mild with clear skies. Dry season conditions continuing with comfortable evenings."
+    },
+    {
+        "city": "Mexico City",
+        "country": "MX",
+        "temperature_c": 19.0,
+        "humidity_pct": 50,
+        "wind_kph": 7.0,
+        "condition": "partly_cloudy",
+        "forecast": "Dry and warm at altitude with haze in the basin. UV index high despite partial cloud cover."
     }
 ]

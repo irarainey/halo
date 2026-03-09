@@ -25,13 +25,14 @@ Settings are managed via Pydantic Settings with the `SAMPLE_API_` env prefix:
 | `SAMPLE_API_APP_VERSION` | `0.1.0` | API version |
 | `SAMPLE_API_HOST` | `0.0.0.0` | Bind host |
 | `SAMPLE_API_PORT` | `3001` | Bind port |
+| `SAMPLE_API_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
 
 ## Endpoints
 
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/weather` | Return current weather conditions and forecast for a city |
-| POST | `/api/books/search` | Search the book catalogue by title or author with optional genre filter |
+| POST | `/api/books` | Search the book catalogue by title or author with optional genre filter |
 | POST | `/api/inventory` | Check stock levels with optional category and low-stock filters |
 | POST | `/api/employees` | Look up employees by department and office |
 
@@ -52,12 +53,15 @@ sample-api/
     ├── data/
     │   ├── __init__.py    # Re-exports loader functions
     │   └── loader.py      # JSON data loader
-    └── models/
-        ├── __init__.py    # Re-exports all model classes
-        ├── books.py       # BookSearchRequest, BookResult, BookSearchResponse
-        ├── employees.py   # EmployeeLookupRequest, Employee, EmployeeLookupResponse
-        ├── inventory.py   # InventoryRequest, InventoryItem, InventoryResponse
-        └── weather.py     # WeatherRequest, WeatherResponse
+    ├── models/
+    │   ├── __init__.py    # Re-exports all model classes
+    │   ├── books.py       # BookSearchRequest, BookResult, BookSearchResponse
+    │   ├── employees.py   # EmployeeLookupRequest, Employee, EmployeeLookupResponse
+    │   ├── inventory.py   # InventoryRequest, InventoryItem, InventoryResponse
+    │   └── weather.py     # WeatherRequest, WeatherResponse
+    └── utils/
+        ├── __init__.py
+        └── logger.py      # Coloured console log formatter
 ```
 
 ## Licence

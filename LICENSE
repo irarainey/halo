@@ -6,7 +6,7 @@ This repository contains two components under different licences:
     Licensed under the Creative Commons Attribution 4.0 International
     License (CC BY 4.0). See LICENSE-SPECIFICATION for details.
 
-  - halohttp Reference Implementation (all source code):
+  - halo-fastapi Reference Implementation (all source code):
     Licensed under the Apache License, Version 2.0.
 
 Unless otherwise noted, all source code files are licensed under the

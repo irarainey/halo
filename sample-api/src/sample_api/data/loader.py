@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-from pathlib import Path
+import pathlib
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
+DATA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "data"
 
 
 def _load(filename: str) -> list[dict]:

@@ -1,25 +1,36 @@
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
+
 import fastapi
-from fastapi import security as security_mod
+from fastapi import security
 
-from sample_api import data, models
-from sample_api import settings as settings_mod
+import halo_fastapi
+from sample_api import data, models, settings
+from sample_api.utils import logger
 
-settings = settings_mod.Settings()
+_settings = settings.Settings()
 
-app = fastapi.FastAPI(title=settings.app_title, version=settings.app_version)
+logger.configure_logging(_settings.log_level)
+_logger = logging.getLogger(__name__)
+
+app = fastapi.FastAPI(title=_settings.app_title, version=_settings.app_version)
+
+# Register the HALO discovery endpoints with the FastAPI app
+halo_fastapi.HaloDiscovery(app)
+
+_logger.info("Sample API configured — %s v%s", _settings.app_title, _settings.app_version)
 
 # -- Auth dependency ----------------------------------------------------------
 
-security = security_mod.HTTPBearer()
+_security = security.HTTPBearer()
 
 
 # -- Weather ------------------------------------------------------------------
 
 
 @app.post("/api/weather", response_model=models.WeatherResponse)
-async def get_weather(body: models.WeatherRequest, _token: str = fastapi.Depends(security)):
+async def get_weather(body: models.WeatherRequest, _token: str = fastapi.Depends(_security)):
     """Return current weather conditions and forecast for a given city."""
     records = data.weather()
     match = next((r for r in records if r["city"].lower() == body.city.lower()), None)
@@ -32,8 +43,8 @@ async def get_weather(body: models.WeatherRequest, _token: str = fastapi.Depends
 # -- Books --------------------------------------------------------------------
 
 
-@app.post("/api/books/search", response_model=models.BookSearchResponse)
-async def search_books(body: models.BookSearchRequest, _token: str = fastapi.Depends(security)):
+@app.post("/api/books", response_model=models.BookSearchResponse)
+async def search_books(body: models.BookSearchRequest, _token: str = fastapi.Depends(_security)):
     """Search the book catalogue by title or author, with optional genre filter."""
     records = data.books()
     query = body.query.lower()
@@ -50,7 +61,7 @@ async def search_books(body: models.BookSearchRequest, _token: str = fastapi.Dep
 
 
 @app.post("/api/inventory", response_model=models.InventoryResponse)
-async def check_inventory(body: models.InventoryRequest, _token: str = fastapi.Depends(security)):
+async def check_inventory(body: models.InventoryRequest, _token: str = fastapi.Depends(_security)):
     """Check stock levels across warehouses with optional category and low-stock filters."""
     records = data.inventory()
     items = records
@@ -68,7 +79,7 @@ async def check_inventory(body: models.InventoryRequest, _token: str = fastapi.D
 
 
 @app.post("/api/employees", response_model=models.EmployeeLookupResponse)
-async def lookup_employees(body: models.EmployeeLookupRequest, _token: str = fastapi.Depends(security)):
+async def lookup_employees(body: models.EmployeeLookupRequest, _token: str = fastapi.Depends(_security)):
     """Look up employees in the company directory with optional department and office filters."""
     records = data.employees()
     results = records
