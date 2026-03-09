@@ -59,7 +59,7 @@ sequence = [
 
 [tool.poe.tasks.test]
 help = "Run unit tests"
-cmd = "pytest tests/ -v"
+cmd = "pytest halo-fastapi/tests/ -v"
 
 # ── Ruff ────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ known-first-party = ["halo_fastapi", "sample_api", "sample_agent_framework"]
 # ── Pytest ──────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["halo-fastapi/tests"]
 asyncio_mode = "auto"
 
 # ── Mypy ────────────────────────────────────────────────────────
