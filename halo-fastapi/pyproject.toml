@@ -15,6 +15,12 @@ dependencies = [
 agent-framework = ["agent-framework-core>=1.0.0rc3"]
 semantic-kernel = ["semantic-kernel>=1.40.0"]
 
+[project.urls]
+Homepage = "https://github.com/irarainey/halo"
+Repository = "https://github.com/irarainey/halo"
+Documentation = "https://github.com/irarainey/halo/blob/main/README.md"
+Changelog = "https://github.com/irarainey/halo/blob/main/CHANGELOG.md"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
