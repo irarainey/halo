@@ -5,6 +5,14 @@ domains. Each endpoint includes Pydantic models with `json_schema_extra`
 metadata so LLM agents can discover capabilities via the `OPTIONS` verb and
 `application/llm+json` content type.
 
+## Dependencies
+
+The sample API is a workspace member. Sync with:
+
+```bash
+uv sync --all-packages
+```
+
 ## Running
 
 From the repository root:

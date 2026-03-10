@@ -42,8 +42,11 @@ class TestPackageExports:
 
     def test_all_list_complete(self) -> None:
         """__all__ contains every public name."""
+        lazy_adapters = {"HaloAgentFrameworkAdapter", "HaloSemanticKernelAdapter"}
         for name in halo_fastapi.__all__:
-            assert hasattr(halo_fastapi, name) or name == "HaloAgentFrameworkAdapter"
+            if name in lazy_adapters:
+                continue
+            assert hasattr(halo_fastapi, name)
 
     def test_lazy_adapter_import(self) -> None:
         """HaloAgentFrameworkAdapter is importable via lazy __getattr__."""

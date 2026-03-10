@@ -6,10 +6,10 @@ license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
     "halo-fastapi[agent-framework]",
-    "agent-framework-core==1.0.0rc2",
-    "python-dotenv>=1.2.1",
+    "agent-framework-core==1.0.0rc3",
+    "python-dotenv>=1.2.2",
     "pydantic-settings>=2.13.1",
-    "agent-framework-devui>=1.0.0b260225",
+    "agent-framework-devui>=1.0.0b260304",
 ]
 
 [build-system]

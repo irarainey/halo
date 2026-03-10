@@ -45,7 +45,7 @@ Tools can be filtered by tag (`OPTIONS /?tags=payments`) so agents only discover
 
 ## Key Features
 
-- **Zero drift** — the schema is derived from the same code that handles requests. If the API changes, the schema changes atomically.
+- **Zero structural drift** — structural fields (inputs, outputs, types, auth) are derived from the same code that handles requests. LLM-native fields (`why`, `tags`, `effects`) are hand-written but co-located with the model.
 - **Tag-filtered discovery** — agents discover only the tools relevant to their task via `OPTIONS /?tags=payments`.
 - **Auth-aware scoping** — pass a token with `OPTIONS /` and the manifest reflects only what those credentials permit.
 - **Lazy loading** — full schemas are fetched only when the agent selects a tool, keeping token costs low.
@@ -96,7 +96,7 @@ result = await plugin.invoke("/api/payments/charge", body={"amount": 1000, "curr
 |---|---|
 | MCP server process | OPTIONS handler inside the existing API |
 | Tool registry | The API is the registry |
-| Schema drift | Structurally impossible |
+| Schema drift | Structural fields cannot drift — derived from code |
 | Proxy layer / extra hop | Agent calls the API directly |
 | Static tool definitions | Dynamic discovery via OPTIONS |
 | Upfront token cost | Lazy, tag-filtered loading |
@@ -121,6 +121,7 @@ The repository includes a dev container with all tooling pre-configured. Open in
 | `poe test` | Run unit tests |
 | `poe lint` | Run ruff and mypy |
 | `poe format` | Auto-format code |
+| `poe build` | Build the `halo-fastapi` package |
 
 ### VS Code launch profiles
 

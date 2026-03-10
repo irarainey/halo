@@ -7,9 +7,9 @@ requires-python = ">=3.13"
 dependencies = [
     "halo-fastapi",
     "semantic-kernel>=1.40.0",
-    "python-dotenv>=1.2.1",
+    "python-dotenv>=1.2.2",
     "pydantic-settings>=2.13.1",
-    "rich>=14.0.0",
+    "rich>=14.3.3",
 ]
 
 [build-system]

@@ -16,13 +16,41 @@ Discovers only the tools matching the tags configured in `HALO_TAGS` and exposes
 
 ## Running
 
-Ensure the sample API is running first, then from the repository root:
+The Agent Framework sample has a dependency conflict with the Semantic Kernel sample (`azure-ai-projects` version mismatch), so it is excluded from the main workspace. Dependencies are installed on demand.
+
+### Using poe tasks (recommended)
+
+Open two VS Code integrated terminals:
 
 ```bash
-python -m sample_agent_framework.main
+# Terminal 1 — start the sample API
+poe api
+
+# Terminal 2 — sync MAF dependencies and start the agent
+poe sync:maf
+poe maf
 ```
 
-Or use the **Agent Framework** launch profile in VS Code. The **Sample API + Agent Framework** compound profile launches both together.
+You only need to run `poe sync:maf` once per session (or after a `uv sync --all-packages` which resets the venv).
+
+### Using VS Code launch profiles
+
+Select **Sample API + Agent Framework** from the Run and Debug dropdown and press F5. The pre-launch task automatically syncs MAF dependencies before starting.
+
+### Manual
+
+```bash
+# Install MAF dependencies (once)
+uv sync --all-packages
+uv pip install -e samples/agent-framework
+
+# Start the API in one terminal
+uvicorn sample_api.main:app --reload --port 3001 --app-dir samples/api/src
+
+# Start the agent in another terminal
+cd samples/agent-framework/src
+python -m sample_agent_framework.main
+```
 
 The DevUI is available at `http://localhost:8080` once the agent starts. If the sample API is not reachable, the DevUI will still start but without any tools registered.
 

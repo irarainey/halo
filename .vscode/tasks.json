@@ -13,7 +13,7 @@
         {
             "label": "Sync MAF",
             "type": "shell",
-            "command": "uv sync --all-packages",
+            "command": "uv sync --all-packages && uv pip install -e samples/agent-framework",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

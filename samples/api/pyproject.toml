@@ -6,9 +6,9 @@ license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
     "halo-fastapi",
-    "fastapi>=0.129.0",
+    "fastapi>=0.135.1",
     "uvicorn[standard]>=0.41.0",
-    "python-dotenv>=1.2.1",
+    "python-dotenv>=1.2.2",
     "pydantic-settings>=2.13.1",
 ]
 

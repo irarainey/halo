@@ -62,12 +62,9 @@ class HaloSemanticKernelAdapter:
             ImportError: If ``semantic-kernel`` is not installed.
         """
         try:
-            from semantic_kernel.functions import KernelFunction, KernelPlugin  # noqa: important[misplaced-import]
+            from semantic_kernel.functions import KernelFunction, KernelPlugin
         except ImportError as exc:
-            msg = (
-                "semantic-kernel is required for HaloSemanticKernelAdapter. "
-                "Install with: uv pip install semantic-kernel"
-            )
+            msg = "semantic-kernel is required for HaloSemanticKernelAdapter. Install with: uv pip install semantic-kernel"
             raise ImportError(msg) from exc
 
         functions: list[KernelFunction] = []
@@ -114,14 +111,8 @@ def _make_invoke_func(
     # Replace the **kwargs signature with explicit parameters so SK
     # maps LLM arguments to named fields instead of a single dict.
     _invoke.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
-        parameters=[
-            inspect.Parameter(p, inspect.Parameter.KEYWORD_ONLY, default=None)
-            for p in param_names
-        ],
+        parameters=[inspect.Parameter(p, inspect.Parameter.KEYWORD_ONLY, default=None) for p in param_names],
     )
-    _invoke.__annotations__ = {
-        p: Annotated[str, schema.input[p].get("description", p)]
-        for p in param_names
-    }
+    _invoke.__annotations__ = {p: Annotated[str, schema.input[p].get("description", p)] for p in param_names}
 
     return _invoke

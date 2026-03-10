@@ -4,6 +4,8 @@
 
 *Self-Describing APIs for LLM Agents — Without MCP*
 
+**Version: 0.2.0-draft**
+
 ## Specification, Implementation & Framework Integration Guide
 
 ---
@@ -23,39 +25,37 @@ Reference Implementation (`halo-fastapi`): [Apache 2.0](https://www.apache.org/l
 
 ## 1. The Problem
 
-Every current approach to connecting LLM agents to external APIs shares the same fundamental flaw: the API description lives somewhere separate from the API itself. MCP servers, tool registries, skill documents, and agent config files are all secondary artifacts that describe an API — but have no binding relationship to it.
+Current approaches to connecting LLM agents to external APIs share a common limitation: the agent-facing description of an API is either maintained separately from the code, or — where it is auto-generated — lacks the LLM-native fields that agents need to reason about tool selection, side effects, and workflow chaining.
+
+Some frameworks auto-generate structural schemas from code (FastAPI's OpenAPI generation, for example, eliminates structural drift for the fields it covers). But even auto-generated OpenAPI is not designed for agent consumption — it lacks fields like `why`, `tags`, `effects`, and `next`, and is not served per-endpoint at runtime. The remaining approaches — MCP servers, tool registries, skill documents, and agent config files — are secondary artifacts that describe an API but have no binding relationship to it.
 
 ### 1.1 How It Works Today
 
-Current agent frameworks — LangChain, Semantic Kernel, Microsoft Agent Framework, and MCP — all follow the same pattern:
+Current agent frameworks — LangChain, Semantic Kernel, Microsoft Agent Framework, and MCP — generally follow a similar pattern:
 
-- A developer writes a tool definition describing what the API does
-- That definition is registered in a tool registry, MCP server, or agent config
+- A developer writes or decorates a tool definition describing what the API does
+- That definition is registered in a tool registry, MCP server, or agent config (some frameworks derive structural schemas from type hints, reducing boilerplate)
 - The LLM reads all definitions at inference time and decides which to call
 - The framework translates that decision into an actual API call
 
-This creates three separate layers: the API, the description, and the translation shim. Each layer can drift independently. Each adds maintenance overhead. Each adds latency and complexity.
+Even when structural schemas are auto-derived from code, the tool definitions still live in the agent's codebase — separate from the API they describe. Each layer can drift independently. Each adds maintenance overhead.
 
 ### 1.2 The Drift Problem
 
 Schema drift is the default outcome of the current approach. The API changes, the tool description does not, and the LLM confidently calls the endpoint with stale parameters. No error surfaces at the description layer — just downstream failures that require log forensics to diagnose. In production systems with dozens of APIs maintained by different teams, this is not an edge case. It is what happens.
 
-When API descriptions are maintained separately from the code — whether as OpenAPI specs, MCP server definitions, or tool descriptions — they tend to diverge over time. Modern frameworks like FastAPI can auto-generate OpenAPI specs from code, which significantly reduces structural drift — but even auto-generated OpenAPI lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not designed for agent consumption.
+When API descriptions are maintained separately from the code — whether as OpenAPI specs, MCP server definitions, or tool descriptions — they tend to diverge over time.
 
 | Problem | Consequence |
 |---|---|
 | Schema drift | Tool descriptions in registries diverge from the real API as it evolves |
-| Version mismatch | The MCP server describes v1 behaviour but the API is on v2 |
+| Version mismatch | The tool description describes v1 behaviour but the API is on v2 |
 | Maintenance burden | Every new API requires a new tool wrapper, schema, and registration |
 | Token cost | All tool descriptions loaded upfront burning context regardless of use |
 | Auth complexity | Auth handled separately from discovery, creating synchronisation problems |
-| Separate service overhead | Clean architecture requires MCP as a standalone service — an additional deployment, pipeline, and operational burden |
-| Separation of concerns | Embedding MCP inside the API conflates domain logic with agent transport protocol, coupling your service's deployment lifecycle to a protocol layer |
-| Extra network hop | MCP acts as a proxy — every tool call passes through an additional network layer, adding latency and a new point of failure |
-| Distributed systems complexity | Adding MCP introduces a second service into every call path — failures, timeouts, and errors become harder to diagnose and attribute |
 | Silent failures | Stale descriptions cause incorrect calls with no schema-level error |
 
-> **Core insight:** The API already knows everything about itself — inputs, outputs, auth, rate limits, side effects. The problem is that nothing asks it. Every secondary artifact that describes an API is a liability. The API itself is the only source of truth that cannot drift.
+> **Core insight:** The API already knows everything about itself — inputs, outputs, auth, rate limits, side effects. The problem is that nothing asks it. Every secondary artifact that describes an API is a liability. The API itself is the only source of truth for its structural contract.
 
 ### 1.3 The Architecture Problem
 
@@ -65,11 +65,15 @@ To maintain clean architecture and proper separation of concerns, an MCP server 
 
 The alternative — embedding MCP directly inside the existing API — avoids the operational overhead but introduces a different problem. MCP is a transport and tool-description protocol. An API is a domain service. Bundling protocol concerns into a domain service conflates two distinct responsibilities: serving domain logic and acting as an agent transport layer. These have different reasons to change and different lifecycles. If MCP evolves, is versioned, or is replaced by a successor protocol, your domain service has to change with it. In a microservices architecture this also contaminates service boundaries that were deliberately drawn.
 
+> **Note on in-process MCP:** MCP supports an in-process stdio transport that avoids the network hop and sidecar deployment. In this mode the latency and failure-point arguments in section 1.4 do not apply. However, the architecture concern remains — the MCP protocol layer is still embedded in (or tightly coupled to) the API process, and the tool descriptions are still maintained as separate artifacts from the code that handles requests.
+
 > **The MCP dilemma:** With MCP you face an unavoidable choice — either maintain a separate service and accept the operational overhead, or embed MCP in your API and accept the separation of concerns violation. There is no clean option. HALO dissolves this dilemma entirely. An OPTIONS handler is not a foreign concern bolted onto the API — it is the API describing itself using a standard HTTP mechanism it already supports. No new protocol layer is introduced. No new service is required. Domain logic and self-description are not two separate concerns: every well-designed API should be able to answer the question "how do I call you?"
 
 ### 1.4 The Proxy Problem
 
-MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
+When deployed as a remote service, MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
+
+> **Fair acknowledgement:** MCP's stdio transport runs in-process and avoids the network hop entirely. The latency and failure-point concerns below apply specifically to remote MCP deployments — which are the recommended architecture for production multi-agent systems.
 
 In isolation, one extra network call seems trivial. In practice it compounds into several distinct problems:
 
@@ -96,7 +100,7 @@ The convention is simple: an LLM agent sends OPTIONS with a custom Accept header
 
 ### 2.2 The Activation Header
 
-A custom Accept header acts as the opt-in signal, ensuring complete backward compatibility with existing CORS handling:
+A custom Accept header acts as the opt-in signal, designed for backward compatibility with existing CORS handling. CORS preflight uses `Access-Control-Request-Method` and `Origin` headers — not `Accept` — so the two mechanisms do not conflict:
 
 ```http
 OPTIONS /api/payments/charge HTTP/1.1
@@ -187,7 +191,7 @@ This solves three problems simultaneously:
 |---|---|
 | Token efficiency | The LLM context only contains tools relevant to the current task, not the entire API surface |
 | Agent specialisation | A payment agent, comms agent, and admin agent all point at the same API but each sees only its own slice — no separate registrations needed |
-| Safety by omission | A read-only agent never discovers write tools. The capability simply does not exist from its perspective — the safest possible implementation of least-privilege |
+| Reduced tool surface | A read-only agent configured to request `OPTIONS /?tags=read` never discovers write tools in its context. This is advisory — not enforced. For true least-privilege, combine tag filtering with auth-gated discovery (section 3.4) so the server only returns tools the caller's credentials permit |
 
 ### 3.3 Recommended Tag Conventions
 
@@ -241,7 +245,7 @@ Agent starts
        ← { charge_id, status }
 ```
 
-Three HTTP calls total. Two OPTIONS, one POST. No registry, no MCP server, no framework configuration.
+Three HTTP calls total. Two OPTIONS, one POST. No registry, no MCP server. The agent still needs the base URL configured, but no per-tool definitions or framework-specific wiring is required.
 
 ### 3.6 Intent-Based Filtering
 
@@ -382,7 +386,7 @@ response = agent.chat('Send a welcome email to the new customer')
 |---|---|---|---|
 | Semantic Kernel | `KernelFunction` | Central kernel, plugins | `why` → description, `next` → planner hints |
 | LangChain | `BaseTool / StructuredTool` | Toolkit pattern | Pydantic `ArgsSchema` from input fields |
-| Microsoft Agent | Azure AI plugin | Azure credential chain | `to_azure_tools()` converts schema |
+| Microsoft Agent | `FunctionTool` | Agent Framework tools | `create_tools()` builds tools from schema |
 | LlamaIndex | `FunctionTool` | `ToolMetadata` object | Pydantic schema from input fields |
 
 ---
@@ -445,7 +449,7 @@ Skills — blocks of text injected into context describing how the LLM should be
 | Maintenance over time | Manual — drifts silently | Structural schema cannot drift; LLM fields (`why`, `tags`) still manual | Protocol wins at scale |
 | Accuracy | As good as the author | Structural fields always correct — derived from code. LLM hints (`why`, `effects`) are hand-written but co-located with the model | Protocol wins |
 | Auth description | Prose — easy to get wrong | Detected and typed automatically | Protocol wins |
-| Schema changes | Someone must update manually | Structural changes reflect instantly — same deploy. LLM metadata changes require a code edit to `json_schema_extra` | Protocol wins |
+| Schema changes | Someone must update manually | Structural changes reflect instantly — same deploy. LLM metadata changes require a code edit to the model's metadata annotations | Protocol wins |
 | Token cost | All loaded upfront always | Lazy, filtered, on demand | Protocol wins |
 | Validation | None — it is text | Testable in CI against live endpoint | Protocol wins |
 | Failure mode | Silent incorrect calls | Explicit 400/422 with structured error | Protocol wins |
@@ -455,9 +459,9 @@ Skills — blocks of text injected into context describing how the LLM should be
 
 Skills fail silently and at the worst possible time. The API changes, the skill doesn't, and the LLM confidently calls the endpoint with stale parameter names. The failure surfaces as incorrect agent behaviour — not as a schema error — and requires log forensics to diagnose.
 
-The OPTIONS protocol cannot drift *structurally* because the schema and the code are the same artifact. The Pydantic model that validates the incoming request is the same model that generates the OPTIONS response. If the model changes, the schema changes atomically with it in the same deployment.
+When implemented natively, the OPTIONS protocol cannot drift *structurally* because the schema is derived from the same code that handles requests. In a framework like FastAPI, the Pydantic model that validates the incoming request is the same model that generates the OPTIONS response. In other languages, the same principle applies whenever the schema is generated from the route and type definitions rather than maintained as a separate artifact. If the code changes, the structural schema changes atomically with it in the same deployment.
 
-> **Honest caveat:** HALO's LLM-native fields — `why`, `tags`, `effects`, `next`, and `examples` — are hand-written metadata in `json_schema_extra`. These can drift from reality in the same way any documentation can. The difference is that they live alongside the Pydantic model in the same file, making staleness visible during code review. Structural fields (inputs, outputs, types, constraints, auth) are fully auto-derived and cannot drift.
+> **Honest caveat:** HALO's LLM-native fields — `why`, `tags`, `effects`, `next`, and `examples` — are hand-written metadata. These can drift from reality in the same way any documentation can. The difference is that they are co-located with the code that defines the endpoint, making staleness visible during code review. Structural fields (inputs, outputs, types, constraints, auth) are auto-derived in implementations that support it and cannot drift.
 
 ### 7.3 Where Each Belongs
 
@@ -478,9 +482,9 @@ Most teams will start with skills because the upfront cost is lower. The natural
 
 ### 8.1 Direct Call Path — No Proxy, No Extra Hop
 
-MCP acts as a proxy. Every tool invocation travels through the MCP server before reaching the API. HALO eliminates this entirely — the agent calls the API directly, always.
+When MCP is deployed as a remote service, it acts as a proxy — every tool invocation travels through the MCP server before reaching the API. (MCP's in-process stdio transport avoids this hop but retains the protocol coupling described in section 1.3.) HALO eliminates the proxy layer entirely — the agent calls the API directly, always.
 
-| | MCP | HALO |
+| | MCP (remote) | HALO |
 |---|---|---|
 | Call path | Agent → MCP server → API | Agent → API |
 | Latency | MCP round-trip added to every call | Minimum possible — direct |
@@ -493,17 +497,17 @@ In distributed systems, every additional hop is not just latency overhead — it
 
 ### 8.2 No Additional Service to Deploy or Maintain
 
-MCP requires a sidecar server process — a separate deployment, a separate codebase, a separate thing that can go down, drift out of sync, or be forgotten when the underlying API changes.
+When deployed as a remote service (the recommended production architecture), MCP requires a sidecar server process — a separate deployment, a separate codebase, a separate thing that can go down, drift out of sync, or be forgotten when the underlying API changes. MCP's in-process stdio transport avoids this but retains the protocol coupling described in section 1.3.
 
 HALO has none of this. The OPTIONS handler runs inside the existing API process. It shares the same deployment pipeline, the same infrastructure, the same uptime guarantees, the same authentication middleware, and the same codebase. There is nothing new to operate. If the API is running, HALO is running. If the API is down, there is nothing for the agent to call anyway.
 
 > **Key strength:** Schema accuracy and zero operational overhead are the same property. Because the HALO handler lives inside the API, it cannot be separately broken, separately outdated, or separately unavailable. Tight coupling is not a tradeoff — it is the point.
 
-### 8.3 Bonus: Works on APIs You Do Not Own
+### 8.3 Conditional Guarantees
 
-It is worth noting that HALO can technically be applied to third-party APIs via a proxy layer — writing OPTIONS handlers that describe Stripe, Twilio, GitHub, or Salesforce endpoints without touching the upstream API at all. This is possible and occasionally useful.
+HALO's core guarantees — no structural drift, no additional service, direct call path — are conditional on the API implementing the protocol natively. When an API serves its own HALO schema from inside its own process, these properties hold by construction.
 
-> **Important caveat:** A proxy reintroduces two of the problems HALO is designed to eliminate. First, it breaks tight coupling — the schema is no longer the same artifact as the code, so it can drift when the upstream API changes. Second, it reintroduces an additional service to deploy and maintain. Both of these are precisely what HALO removes when implemented natively. Treat the proxy pattern as a last resort for legacy or third-party integrations where no better option exists. The gold standard — an API serving its own HALO schema from inside its own process — preserves both guarantees.
+For third-party APIs you do not control, it is technically possible to write a proxy that serves HALO schemas on behalf of the upstream API. This reintroduces drift risk (the schema is no longer derived from the same code) and operational overhead (an additional service to maintain). This is no different from the problems HALO solves for native implementations — it is simply the unavoidable cost of describing an API you do not own. Treat the proxy pattern as a last resort for legacy or third-party integrations where native adoption is not possible.
 
 ### 8.4 The Schema Is Testable
 
@@ -511,14 +515,14 @@ Because the schema lives on an HTTP endpoint it can be validated in CI:
 
 ```bash
 curl -X OPTIONS https://api.example.com/payments/charge \
-     -H 'Accept: application/llm+json' | halo-fastapi validate
+     -H 'Accept: application/llm+json' | jq .
 ```
 
-Catch drift before it reaches production. A static JSON file in a repository has no equivalent.
+Catch drift before it reaches production. Static schema files (like OpenAPI specs) can also be validated in CI, but they test the *file* — not the live endpoint. HALO's testability advantage is that the schema under test is the same one agents will receive at runtime.
 
 ### 8.5 Version Controls Itself
 
-When the API changes, the OPTIONS response changes with it — same deployment, same commit, same version. A tool definition describing v1 behaviour while the API is on v2 is structurally impossible because they are the same thing.
+When the API changes, the OPTIONS response changes with it — same deployment, same commit, same version. Structural fields (inputs, outputs, types, auth) are derived from the code that handles requests, so a tool definition describing v1 behaviour while the API is on v2 cannot happen for those fields. LLM-native fields (`why`, `tags`, `effects`, `next`) are hand-written metadata and can still drift, but they live alongside the model definition, making staleness visible during code review.
 
 ### 8.6 Monitorable Out of the Box
 
@@ -528,19 +532,15 @@ OPTIONS requests appear in your existing access logs. You can see exactly which 
 
 Because OPTIONS responses come from the same authenticated server as the API calls themselves, the trust boundary is consistent — if you trust the API enough to call it, you trust the schema enough to read it. The description and the endpoint share the same security perimeter.
 
-### 8.8 LLMs Are Already Trained on OPTIONS
+### 8.8 OPTIONS Is a Familiar HTTP Primitive
 
-Every HTTP tutorial, RFC, CORS guide, and API documentation corpus that went into training these models includes OPTIONS. The model already understands what OPTIONS means semantically — capability negotiation, preflight, introspection. Serving a schema via OPTIONS uses a concept deeply internalised in the model's training.
+OPTIONS is a well-established HTTP method with clear semantics: capability negotiation and introspection. Developers, HTTP clients, and documentation tooling already understand it. Using OPTIONS for HALO means the protocol builds on an existing, widely understood mechanism rather than introducing a novel one — lowering the barrier to adoption for both humans implementing it and tools consuming it.
 
 ### 8.9 Multi-Tenant Tool Scoping Is Natural
 
-In systems where different users have different permissions, the OPTIONS response varies per request based on the auth token — different permitted fields, different rate limits, different available actions. No other approach handles this without explicit code in the tool registry. Here it falls out naturally from the fact that the server already knows what the caller is allowed to do.
+In systems where different users have different permissions, the OPTIONS response varies per request based on the auth token — different permitted fields, different rate limits, different available actions. Other approaches can achieve this (an API that filters its OpenAPI spec by auth token, for example), but it requires bespoke implementation. With HALO, auth-scoped discovery is the default pattern — it falls out naturally from the fact that the server already knows what the caller is allowed to do.
 
-### 8.10 The Network Effect Is Asymmetric
-
-One server implementing the convention makes every agent framework that implements the client adapter immediately capable of using that API. One client adapter makes every server that implements it immediately usable. The first few implementations create disproportionate value because compatibility is immediate and universal.
-
-### 8.11 The API Owner Regains Control
+### 8.10 The API Owner Regains Control
 
 An API that serves `application/llm+json` from OPTIONS is making a declaration: *I am ready to be used by machines, on my own terms, without an intermediary.* This gives control back to the people who actually know the API — the people who built it.
 
@@ -556,12 +556,12 @@ An API that serves `application/llm+json` from OPTIONS is making a declaration: 
 | Distributed call chain | Two-hop call path: agent to API. Failures immediately attributable. |
 | Tool registry | The API is the registry. Root OPTIONS returns the full manifest. |
 | Schema files (OpenAPI) | Schema lives on the route itself, versioned with the code |
-| Schema drift | Structurally impossible — schema IS the API |
+| Structural schema drift | Eliminated for auto-derived fields — schema is generated from the code that handles requests. LLM-native fields (`why`, `tags`, `effects`) are co-located but still hand-written. |
 | Auth in tool config | Auth shape served with schema, secrets in agent credential map |
 | Hardcoded retry logic | `resilience` fields declare the API's own retry contract |
 | Workflow definitions | `next` field creates emergent workflows from API metadata |
 | Static tool definitions | Dynamic discovery — tools appear when APIs implement the convention |
-| Skill drift | Schema cannot drift — same artifact as the code that validates requests |
+| Skill drift | Structural schema cannot drift — same artifact as the code that validates requests. LLM-native hints are co-located with the model. |
 
 ---
 
@@ -588,7 +588,7 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 |---|---|
 | HAL (Hypertext Application Language) | Hypermedia links in response bodies for API navigation. No LLM-native fields. Complementary. |
 | OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not served per-endpoint at runtime. |
-| agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent but still a static file — inherits drift problems. |
+| agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent to HALO — covers tool schemas, authentication flows, and API-level rate limits. However, it is a static file that must be maintained separately from the code, inheriting drift risk for structural fields. HALO’s per-endpoint OPTIONS approach derives structural schemas from the code at runtime. |
 | HAL MCP Server | An MCP server wrapping HTTP APIs for LLMs. Adds the MCP layer rather than removing it. |
 | GraphQL Introspection | Runtime schema discovery — genuinely live and self-describing, but locked to GraphQL. HALO fills this gap for REST. |
 | HATEOAS | Next-action links in responses. Spiritually similar to HALO's `next` field but designed for human navigation. |
@@ -971,40 +971,7 @@ Both adapters follow the same pattern: discover via `HaloClient`, pass the clien
 
 ---
 
-## 13. Recommended Build Order
-
-### Phase 1 — Core Convention (Week 1–2)
-
-1. Define `application/llm+json` schema as a JSON Schema document and publish to GitHub with CC BY 4.0
-2. Build TypeScript reference client: OPTIONS discovery, tag filtering, schema fetch, safe call
-3. Build `halo-fastapi` FastAPI plugin — auto-derives schema from Pydantic models and route metadata (Apache 2.0)
-4. Build Express.js middleware equivalent
-
-### Phase 2 — Validation and Tooling (Week 3–4)
-
-1. CLI validator: `halo-fastapi validate <url>`
-2. OpenAPI bridge: auto-generate `application/llm+json` from existing OpenAPI specs
-3. CI test suite covering auth types, discovery, tag filtering, side effects, and chaining
-4. Publish `halo-fastapi` to PyPI via `uv`
-
-### Phase 3 — Framework Adapters (Month 2)
-
-1. Semantic Kernel `HaloSemanticKernelAdapter` *(implemented)*
-2. LangChain `HaloLangChainAdapter`
-3. LlamaIndex `HaloLlamaIndexAdapter`
-4. Microsoft Agent Framework `HaloAgentFrameworkAdapter` with Azure credential integration
-5. Reference demo: multi-tool agent with zero static tool definitions
-
-### Phase 4 — Ecosystem (Month 3+)
-
-1. Public schema registry for cryptographic signature verification
-2. VS Code extension for schema authoring and validation
-3. Rails, Laravel, and Django Ninja server-side plugins
-4. Submit to IETF as an informational RFC
-
----
-
-## 14. Summary
+## 13. Summary
 
 **The Convention**
 
@@ -1021,11 +988,11 @@ Send `HTTP OPTIONS` with `Accept: application/llm+json` to any API endpoint. Rec
 
 **Skills vs Protocol**
 
-Skills describe behaviour and judgment — use them for that. The OPTIONS protocol describes mechanical API capability — use it for that. Skills drift silently. Schemas cannot drift. Use both, for the right purpose.
+Skills describe behaviour and judgment — use them for that. The OPTIONS protocol describes mechanical API capability — use it for that. Skills drift silently. Structural schemas derived from code cannot drift. LLM-native fields are co-located with the model but remain hand-written. Use both, for the right purpose.
 
 **What it removes**
 
-MCP server · Tool registry · Schema drift · Skill drift · Auth sync · Sidecar processes · Static tool definitions · Upfront token cost · Silent failures · Extra network hop · Distributed call chain complexity
+MCP server · Tool registry · Structural schema drift · Skill drift · Auth sync · Sidecar processes · Static tool definitions · Upfront token cost · Silent failures · Extra network hop · Distributed call chain complexity
 
 **What it adds**
 

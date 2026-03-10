@@ -14,6 +14,36 @@ The Python reference implementation of the [HALO protocol](../halo-specification
 uv add halo-fastapi
 ```
 
+### Optional Extras
+
+The framework adapters have optional dependencies that conflict with each other (`azure-ai-projects` version mismatch), so they cannot be installed in the same environment:
+
+```bash
+# Agent Framework adapter
+uv add "halo-fastapi[agent-framework]"
+
+# Semantic Kernel adapter
+uv add "halo-fastapi[semantic-kernel]"
+```
+
+### Development (Monorepo)
+
+`halo-fastapi` is a workspace member. To sync the core workspace:
+
+```bash
+uv sync --all-packages
+```
+
+The sample agent apps are excluded from the workspace due to conflicting transitive dependencies. Install them on demand:
+
+```bash
+# Agent Framework sample
+uv pip install -e samples/agent-framework
+
+# Semantic Kernel sample
+uv pip install -e samples/semantic-kernel
+```
+
 ## Server Usage
 
 ```python
@@ -78,10 +108,10 @@ tools = await adapter.create_tools()  # list[FunctionTool]
 
 ## Semantic Kernel Integration (Optional)
 
-`HaloSemanticKernelAdapter` converts discovered HALO tools into a Semantic Kernel `KernelPlugin`. Install `semantic-kernel` directly (not as an extra, due to transitive dependency conflicts with `agent-framework-core`):
+`HaloSemanticKernelAdapter` converts discovered HALO tools into a Semantic Kernel `KernelPlugin`. Install with the optional extra (cannot coexist with `halo-fastapi[agent-framework]` due to transitive dependency conflicts):
 
 ```bash
-uv pip install semantic-kernel
+uv add "halo-fastapi[semantic-kernel]"
 ```
 
 ```python

@@ -8,7 +8,6 @@ requires-python = ">=3.13"
 dependencies = [
     "halo-fastapi",
     "halo-sample-api",
-    "halo-sample-agent-framework",
 ]
 
 [dependency-groups]
@@ -18,19 +17,29 @@ dev = [
     "ruff>=0.15.2",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.uv]
 prerelease = "allow"
 
+# The agent-framework and semantic-kernel extras for halo-fastapi have
+# conflicting transitive dependencies (azure-ai-projects) and are never
+# installed together.
+conflicts = [
+    [
+        { package = "halo-fastapi", extra = "agent-framework" },
+        { package = "halo-fastapi", extra = "semantic-kernel" },
+    ],
+]
+
 [tool.uv.workspace]
 members = ["halo-fastapi", "samples/*"]
-exclude = ["samples/semantic-kernel"]
+exclude = ["samples/agent-framework", "samples/semantic-kernel"]
 
 [tool.uv.sources]
 halo-fastapi = { workspace = true }
 halo-sample-api = { workspace = true }
-halo-sample-agent-framework = { workspace = true }
 
 # ── Poe tasks ───────────────────────────────────────────────────
 
@@ -68,7 +77,10 @@ cmd = "pytest halo-fastapi/tests/ -v"
 
 [tool.poe.tasks."sync:maf"]
 help = "Sync dependencies for Agent Framework development"
-cmd = "uv sync --all-packages --reinstall"
+sequence = [
+    { cmd = "uv sync --all-packages --reinstall" },
+    { cmd = "uv pip install -e samples/agent-framework" },
+]
 
 [tool.poe.tasks."sync:sk"]
 help = "Sync dependencies for Semantic Kernel development"
