@@ -32,13 +32,13 @@ Select **Sample API + Semantic Kernel** from the Run and Debug dropdown and pres
 ```bash
 # Install SK dependencies (once)
 uv sync --all-packages
-uv pip install -e samples/semantic-kernel
+uv pip install -e samples/agents/semantic-kernel
 
 # Start the API in one terminal
-uvicorn sample_api.main:app --reload --port 3001 --app-dir samples/api/src
+uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/api/src
 
 # Start the SK chat in another terminal
-cd samples/semantic-kernel/src
+cd samples/agents/semantic-kernel/src
 python -m sample_semantic_kernel.main
 ```
 
@@ -49,7 +49,7 @@ Settings are managed via Pydantic Settings. The `.env` file in the repository ro
 | Variable | Default | Description |
 |---|---|---|
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
-| `API_BASE_URL` | `http://localhost:3001` | URL of the HALO-compliant API to consume |
+| `API_BASE_URL` | `http://localhost:3010` | URL of the HALO-compliant API to consume |
 | `API_TOKEN` | `halo-sample-token` | Bearer token for API authentication |
 | `AZURE_OPENAI_ENDPOINT` | *(required)* | Azure OpenAI resource endpoint |
 | `AZURE_OPENAI_API_KEY` | *(required)* | Azure OpenAI API key |
@@ -66,7 +66,7 @@ Settings are managed via Pydantic Settings. The `.env` file in the repository ro
 ## Project Structure
 
 ```text
-samples/semantic-kernel/
+samples/agents/semantic-kernel/
 └── src/sample_semantic_kernel/
     ├── main.py      # CLI chat loop with Rich
     └── settings.py  # Pydantic Settings configuration

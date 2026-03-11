@@ -29,10 +29,6 @@ class HaloAuth(pydantic.BaseModel):
         serialization_alias="tokenUrl",
         description="OAuth token endpoint URL",
     )
-    already: bool = pydantic.Field(
-        default=False,
-        description="If true, discovery credentials are valid for invocation",
-    )
 
 
 class HaloCall(pydantic.BaseModel):

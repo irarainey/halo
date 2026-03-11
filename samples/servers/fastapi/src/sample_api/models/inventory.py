@@ -63,3 +63,47 @@ class InventoryResponse(pydantic.BaseModel):
 
     items: list[InventoryItem] = pydantic.Field(..., description="List of inventory items matching the filter")
     total: int = pydantic.Field(..., description="Number of items returned")
+
+
+class CreateInventoryItemRequest(pydantic.BaseModel):
+    """Request body to add a new item to the inventory."""
+
+    name: str = pydantic.Field(..., description="Product name")
+    category: Annotated[
+        Literal["electronics", "furniture", "stationery", "accessories"],
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field(..., description="Product category")
+    price_gbp: float = pydantic.Field(0.0, description="Unit price in GBP")
+    stock: int = pydantic.Field(0, description="Initial units in stock")
+    warehouse: str = pydantic.Field("London-Central", description="Warehouse location")
+
+    model_config = pydantic.ConfigDict(
+        json_schema_extra={
+            "llm": {
+                "why": (
+                    "Use to add a new product to the warehouse inventory. "
+                    "Requires name and category. "
+                    "The item appears immediately in GET /api/inventory results. "
+                    "Data is stored in memory and resets on server restart."
+                ),
+                "tags": ["inventory", "write"],
+                "effects": {"reversible": False},
+                "examples": [
+                    {
+                        "input": {"name": "USB-C Hub", "category": "electronics", "price_gbp": 29.99, "stock": 50},
+                        "output": {"sku": "EL-A1B2", "name": "USB-C Hub"},
+                    },
+                ],
+            }
+        }
+    )
+
+
+class CreateInventoryItemResponse(pydantic.BaseModel):
+    """Response after successfully adding an inventory item."""
+
+    sku: str = pydantic.Field(..., description="Assigned SKU")
+    name: str = pydantic.Field(..., description="Product name")
+    category: str = pydantic.Field(..., description="Product category")
+    stock: int = pydantic.Field(..., description="Initial stock level")
+    message: str = pydantic.Field(..., description="Confirmation message")

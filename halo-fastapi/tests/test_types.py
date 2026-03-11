@@ -21,7 +21,6 @@ class TestHaloAuth:
         assert auth.header is None
         assert auth.scopes == []
         assert auth.token_url is None
-        assert auth.already is False
 
     def test_bearer(self) -> None:
         auth = _types.HaloAuth(type="bearer")
@@ -47,10 +46,6 @@ class TestHaloAuth:
         auth = _types.HaloAuth(type="oauth", token_url="https://example.com/token")
         dumped = auth.model_dump(by_alias=True)
         assert "tokenUrl" in dumped
-
-    def test_already_flag(self) -> None:
-        auth = _types.HaloAuth(type="bearer", already=True)
-        assert auth.already is True
 
 
 # ── HaloCall ────────────────────────────────────────────────────

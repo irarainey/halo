@@ -8,13 +8,10 @@ _ENV_FILE = pathlib.Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(pydantic_settings.BaseSettings):
-    api_base_url: str = "http://localhost:3001"
-    api_token: str = "halo-sample-token"
-    azure_openai_endpoint: str = ""
-    azure_openai_api_key: str = ""
-    azure_openai_deployment: str = ""
-    openai_api_version: str = "2024-12-01-preview"
-    halo_tags: str = "weather,books"
+    app_title: str = "Sample HALO API"
+    app_version: str = "0.1.0"
+    host: str = "0.0.0.0"
+    port: int = 3010
     log_level: str = "INFO"
 
     model_config = pydantic_settings.SettingsConfigDict(

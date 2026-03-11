@@ -105,7 +105,7 @@ def _make_invoke_func(
         # SK 1.40 wraps arguments in a "kwargs" key despite signature
         # patching. Unwrap if present.
         body = kwargs.get("kwargs", kwargs) if "kwargs" in kwargs else kwargs
-        result = await client.invoke(path, body=body)
+        result = await client.invoke(path, body=body, method=schema.call.method)
         return json.dumps(result)
 
     # Replace the **kwargs signature with explicit parameters so SK

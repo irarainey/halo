@@ -82,13 +82,15 @@ class HaloAgentFrameworkAdapter:
         for entry in self._client.tools:
             schema = await self._client.get_tool(entry.url, method=entry.method or None)
             path = entry.url
+            tool_method = schema.call.method
 
             async def _invoke(
                 _path: str = path,
+                _method: str = tool_method,
                 **kwargs: Any,
             ) -> str:
-                logger.debug("Tool invoked: %s with %s", _path, kwargs)
-                result = await self._client.invoke(_path, body=kwargs)
+                logger.debug("Tool invoked: %s %s with %s", _method, _path, kwargs)
+                result = await self._client.invoke(_path, body=kwargs, method=_method)
                 return json.dumps(result)
 
             tool = agent_framework.FunctionTool(

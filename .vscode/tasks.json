@@ -13,7 +13,7 @@
         {
             "label": "Sync MAF",
             "type": "shell",
-            "command": "uv sync --all-packages && uv pip install -e samples/agent-framework",
+            "command": "uv sync --all-packages && uv pip install -e samples/agents/agent-framework",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -24,7 +24,7 @@
         {
             "label": "Sync SK",
             "type": "shell",
-            "command": "uv sync --all-packages && uv pip install -e samples/semantic-kernel",
+            "command": "uv sync --all-packages && uv pip install -e samples/agents/semantic-kernel",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

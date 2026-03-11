@@ -263,11 +263,11 @@ Accept: application/llm+json
   "version": "2.1.0",
   "description": "Payment processing, customer management, and communications for the Example platform.",
   "tools": [
-    { "url": "/api/payments/charge",   "name": "charge",  "description": "Charge a payment method",          "tags": ["payments", "write"] },
-    { "url": "/api/payments/refund",   "name": "refund",  "description": "Refund a previous charge",          "tags": ["payments", "write"] },
-    { "url": "/api/customers/lookup",  "name": "lookup",  "description": "Look up customer details",           "tags": ["customers", "read"] },
-    { "url": "/api/email/send",        "name": "send",    "description": "Send an email to a recipient",       "tags": ["comms", "write"] },
-    { "url": "/api/admin/users",       "name": "users",   "description": "Manage admin user accounts",         "tags": ["admin", "write"] }
+    { "url": "/api/payments/charge",   "method": "POST", "name": "charge",  "description": "Charge a payment method",          "tags": ["payments", "write"] },
+    { "url": "/api/payments/refund",   "method": "POST", "name": "refund",  "description": "Refund a previous charge",          "tags": ["payments", "write"] },
+    { "url": "/api/customers/lookup",  "method": "GET",  "name": "lookup",  "description": "Look up customer details",           "tags": ["customers", "read"] },
+    { "url": "/api/email/send",        "method": "POST", "name": "send",    "description": "Send an email to a recipient",       "tags": ["comms", "write"] },
+    { "url": "/api/admin/users",       "method": "POST", "name": "users",   "description": "Manage admin user accounts",         "tags": ["admin", "write"] }
   ]
 }
 ```
@@ -528,7 +528,7 @@ response = agent.chat('Send a welcome email to the new customer')
 | `api` | Name of the API |
 | `version` | API version string |
 | `description` | What this API does — helps LLMs decide whether to explore its tools |
-| `tools` | Array of tool entries (url, name, description, tags) |
+| `tools` | Array of tool entries (url, method, name, description, tags) |
 
 **Per-endpoint fields** (`OPTIONS /route` response):
 
@@ -988,6 +988,16 @@ async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
 > **Description vs why:** The docstring is the fallback description — what the endpoint does, written for developers. The `why` field is the LLM routing hint — when to call this tool vs alternatives, written for the model. If both are present, `why` takes precedence in the HALO schema.
 
 > **Tags rule:** Tags are the single most impactful field for agent performance. They determine which agents discover the tool at all. At minimum, every endpoint should have a domain tag (`payments`, `email`, `calendar`) and a `read`/`write` tag. Without tags, the tool appears in all discovery requests regardless of relevance.
+
+> **Implementation note — GET endpoints with query parameters:** HALO derives input schemas and LLM metadata (`why`, `tags`, `effects`) from Pydantic request body models. For GET endpoints that use query parameters instead of a request body, implementations should also inspect dependency-injected Pydantic models (e.g. FastAPI's `Depends()` pattern). In `halo-fastapi`, a GET endpoint can carry full LLM metadata by using a Pydantic model as a query dependency:
+>
+> ```python
+> @app.get('/api/books', response_model=BookSearchResponse)
+> async def search_books(params: BookSearchRequest = Depends()):
+>     ...
+> ```
+>
+> The `BookSearchRequest` model carries `json_schema_extra` with `why`, `tags`, and `examples` — the same pattern used for POST body models. HALO introspects the dependency and extracts the schema automatically. Without this pattern, GET endpoints will have no input schema, no tags, and the `why` field will fall back to the docstring.
 
 ### 12.5 What halo-fastapi Derives Automatically
 

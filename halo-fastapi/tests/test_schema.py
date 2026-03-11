@@ -637,3 +637,88 @@ class TestHaloRegister:
             )
         data = resp.json()
         assert data["tools"][0]["method"] == "POST"
+
+    async def test_multi_method_manifest_lists_both(self) -> None:
+        """Manifest lists separate tool entries for each method on the same path."""
+        app = _make_app()
+
+        @app.get("/api/items")
+        async def list_items() -> list[dict[str, str]]:
+            """List items."""
+            return []
+
+        @app.post("/api/items")
+        async def create_item(body: CreateItem) -> dict[str, str]:
+            """Create an item."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        items_tools = [t for t in data["tools"] if t["url"] == "/api/items"]
+        assert len(items_tools) == 2
+        methods = {t["method"] for t in items_tools}
+        assert methods == {"GET", "POST"}
+
+    async def test_multi_method_tag_filtering(self) -> None:
+        """Tag filtering returns only matching methods on multi-method paths."""
+        app = _make_app()
+
+        @app.get("/api/items")
+        async def list_items(body: BooksBody) -> list[dict[str, str]]:
+            """List items."""
+            return []
+
+        @app.post("/api/items")
+        async def create_item(body: WeatherBody) -> dict[str, str]:
+            """Create an item."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/?tags=books",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        assert len(data["tools"]) == 1
+        assert data["tools"][0]["method"] == "GET"
+
+    async def test_multi_method_schemas_have_different_content(self) -> None:
+        """Different methods on the same path return different schema content."""
+        app = _make_app()
+
+        @app.get("/api/items")
+        async def list_items() -> list[dict[str, str]]:
+            """List items."""
+            return []
+
+        @app.post("/api/items")
+        async def create_item(body: CreateItem) -> dict[str, str]:
+            """Create an item."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/api/items",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        get_schema = next(s for s in data if s["call"]["method"] == "GET")
+        post_schema = next(s for s in data if s["call"]["method"] == "POST")
+        assert get_schema["description"] == "List items."
+        assert post_schema["description"] == "Create an item."
+        # POST has input fields, GET does not.
+        assert "input" not in get_schema
+        assert "name" in post_schema.get("input", {})

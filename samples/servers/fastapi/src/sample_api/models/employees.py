@@ -63,3 +63,47 @@ class EmployeeLookupResponse(pydantic.BaseModel):
 
     employees: list[Employee] = pydantic.Field(..., description="List of employees matching the filter criteria")
     total: int = pydantic.Field(..., description="Number of employees returned")
+
+
+class CreateEmployeeRequest(pydantic.BaseModel):
+    """Request body to register a new employee."""
+
+    name: str = pydantic.Field(..., description="Full name")
+    department: Annotated[
+        Literal["engineering", "marketing", "finance", "hr", "design", "sales"],
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field(..., description="Department")
+    role: str = pydantic.Field(..., description="Job title")
+    office: str = pydantic.Field("London", description="Office location")
+
+    model_config = pydantic.ConfigDict(
+        json_schema_extra={
+            "llm": {
+                "why": (
+                    "Use to register a new employee in the company directory. "
+                    "Requires name, department, and role. "
+                    "The employee appears immediately in GET /api/employees results. "
+                    "Data is stored in memory and resets on server restart."
+                ),
+                "tags": ["employees", "write"],
+                "effects": {"reversible": False},
+                "examples": [
+                    {
+                        "input": {"name": "Jane Smith", "department": "engineering", "role": "Backend Developer"},
+                        "output": {"employee_id": "EMP-A1B2C3", "name": "Jane Smith"},
+                    },
+                ],
+            }
+        }
+    )
+
+
+class CreateEmployeeResponse(pydantic.BaseModel):
+    """Response after successfully registering an employee."""
+
+    employee_id: str = pydantic.Field(..., description="Assigned employee ID")
+    name: str = pydantic.Field(..., description="Full name")
+    department: str = pydantic.Field(..., description="Department")
+    role: str = pydantic.Field(..., description="Job title")
+    email: str = pydantic.Field(..., description="Generated work email")
+    message: str = pydantic.Field(..., description="Confirmation message")

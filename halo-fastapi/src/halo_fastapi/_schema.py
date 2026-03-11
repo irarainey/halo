@@ -114,11 +114,24 @@ def _build_schema(
     hints = get_type_hints(endpoint)
     body_type = hints.get("body")
 
+    # If no explicit body parameter, check for Pydantic models used as
+    # query-parameter dependencies (e.g. ``params: MyModel = Depends()``).
+    # These carry the same ``json_schema_extra`` LLM metadata as body models.
+    query_model: type | None = None
+    if body_type is None:
+        for param_name, param_type in hints.items():
+            if param_name == "return":
+                continue
+            if hasattr(param_type, "model_json_schema"):
+                query_model = param_type
+                break
+
     # Extract LLM extra and input schema from the Pydantic model.
     llm_extra: dict[str, Any] = {}
     input_fields: dict[str, Any] = {}
-    if body_type is not None and hasattr(body_type, "model_json_schema"):
-        raw_schema = body_type.model_json_schema()
+    model_type = body_type or query_model
+    if model_type is not None and hasattr(model_type, "model_json_schema"):
+        raw_schema = model_type.model_json_schema()
         llm_extra = raw_schema.get("llm", {})
         input_fields = _extract_input_fields(raw_schema)
 
@@ -221,7 +234,8 @@ class HaloRegister:
 
             schema = _build_schema(route, auth)
             self._schemas.setdefault(route.path, []).append(schema)
-            self._endpoint_names[route.path] = route.endpoint.__name__
+            key = f"{schema.call.method}:{route.path}"
+            self._endpoint_names[key] = route.endpoint.__name__
             _logger.debug("Registered HALO schema for %s %s", schema.call.method, route.path)
 
         total = sum(len(v) for v in self._schemas.values())
@@ -260,11 +274,12 @@ class HaloRegister:
                         continue
                     if tool_filter and not tool_filter(request, path):
                         continue
+                    name_key = f"{schema.call.method}:{path}"
                     tools.append(
                         _types.HaloToolEntry(
                             url=path,
                             method=schema.call.method,
-                            name=endpoint_names.get(path, path.strip("/").split("/")[-1]),
+                            name=endpoint_names.get(name_key, path.strip("/").split("/")[-1]),
                             description=schema.description,
                             tags=schema.tags,
                         )
