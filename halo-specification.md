@@ -75,7 +75,7 @@ The alternative — embedding MCP directly inside the existing API — avoids th
 
 When deployed as a remote service, MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
 
-> **Fair acknowledgement:** MCP's stdio transport runs in-process and avoids the network hop entirely. The latency and failure-point concerns below apply specifically to remote MCP deployments — which are the recommended architecture for production multi-agent systems.
+> **Fair acknowledgement:** The latency and failure-point concerns below apply specifically to remote MCP deployments. MCP's stdio transport runs in-process and avoids the network hop entirely (see section 1.3).
 
 In isolation, one extra network call seems trivial. In practice it compounds into several distinct problems:
 
@@ -118,33 +118,39 @@ Servers that do not implement HALO return a 406 or their standard OPTIONS respon
 
 ### 2.3 The Schema Response
 
+A per-endpoint `OPTIONS` response is always a JSON array — one schema per HTTP method on that path. For a single-method path, this is a one-element array:
+
 ```json
-{
-  "description": "Charge a payment method for a given amount",
-  "call":    { "method": "POST", "url": "/api/payments/charge" },
-  "auth":    { "type": "bearer", "scopes": ["payments:write"] },
-  "input":   {
-    "amount":      { "type": "number", "required": true, "description": "Amount in pence" },
-    "currency":    { "type": "string", "enum": ["GBP","USD","EUR"], "required": true },
-    "customer_id": { "type": "string", "required": true }
-  },
-  "output":  { "charge_id": { "type": "string" }, "status": { "type": "string" } },
-  "why":     "Use to charge a customer immediately. Prefer /authorise for pre-auth flows.",
-  "effects": { "reversible": true, "undo": "/api/payments/refund" },
-  "limits":  { "rate": "100/hour", "idempotent": false },
-  "tags":    ["payments", "write"],
-  "next": [
-    { "when": "status=pending", "suggest": "/api/payments/confirm" },
-    { "when": "status=failed",  "suggest": "/api/payments/retry" }
-  ],
-  "examples": [
-    {
-      "input":  { "amount": 1000, "currency": "GBP", "customer_id": "cust_123" },
-      "output": { "charge_id": "ch_456", "status": "success" }
-    }
-  ]
-}
+[
+  {
+    "description": "Charge a payment method for a given amount",
+    "call":    { "method": "POST", "url": "/api/payments/charge" },
+    "auth":    { "type": "bearer", "scopes": ["payments:write"] },
+    "input":   {
+      "amount":      { "type": "number", "required": true, "description": "Amount in pence" },
+      "currency":    { "type": "string", "enum": ["GBP","USD","EUR"], "required": true },
+      "customer_id": { "type": "string", "required": true }
+    },
+    "output":  { "charge_id": { "type": "string" }, "status": { "type": "string" } },
+    "why":     "Use to charge a customer immediately. Prefer /authorise for pre-auth flows.",
+    "effects": { "reversible": true, "undo": "/api/payments/refund" },
+    "limits":  { "rate": "100/hour", "idempotent": false },
+    "tags":    ["payments", "write"],
+    "next": [
+      { "when": "status=pending", "suggest": "/api/payments/confirm" },
+      { "when": "status=failed",  "suggest": "/api/payments/retry" }
+    ],
+    "examples": [
+      {
+        "input":  { "amount": 1000, "currency": "GBP", "customer_id": "cust_123" },
+        "output": { "charge_id": "ch_456", "status": "success" }
+      }
+    ]
+  }
+]
 ```
+
+The server must respond with `Content-Type: application/llm+json`.
 
 ### 2.4 Why Not Use OpenAPI?
 
@@ -286,6 +292,7 @@ OPTIONS /?tags=payments
 OPTIONS /?tags=read
 
 # Discover tools matching any of the specified tags (OR semantics)
+# Matching is case-sensitive. Tags are comma-delimited.
 OPTIONS /?tags=payments,read
 ```
 
@@ -322,14 +329,14 @@ When credentials are passed with the root OPTIONS request, the manifest reflects
 ```json
 // Read-only token:
 { "tools": [
-  { "url": "/api/customers/lookup", "name": "lookup", "description": "Look up customer details", "tags": ["customers","read"] }
+  { "url": "/api/customers/lookup", "method": "GET", "name": "lookup", "description": "Look up customer details", "tags": ["customers","read"] }
 ] }
 
 // Full-access token:
 { "tools": [
-  { "url": "/api/payments/charge",  "name": "charge", "description": "Charge a payment method",   "tags": ["payments","write"] },
-  { "url": "/api/customers/lookup", "name": "lookup", "description": "Look up customer details",  "tags": ["customers","read"] },
-  { "url": "/api/admin/users",      "name": "users",  "description": "Manage admin user accounts", "tags": ["admin","write"] }
+  { "url": "/api/payments/charge",  "method": "POST", "name": "charge", "description": "Charge a payment method",   "tags": ["payments","write"] },
+  { "url": "/api/customers/lookup", "method": "GET",  "name": "lookup", "description": "Look up customer details",  "tags": ["customers","read"] },
+  { "url": "/api/admin/users",      "method": "POST", "name": "users",  "description": "Manage admin user accounts", "tags": ["admin","write"] }
 ] }
 ```
 
@@ -348,8 +355,8 @@ Agent starts
    │   LLM call 1: "Charge customer £25"
    │   LLM selects: charge (based on name + description)
    │
-   ├── OPTIONS /payments/charge    ← full schema: input, auth, effects
-   │   ← { input: {amount, currency, customer_id}, auth: bearer }
+   ├── OPTIONS /payments/charge    ← full schema array: [{input, auth, effects}]
+   │   ← [{ input: {amount, currency, customer_id}, auth: bearer }]
    │
    │   LLM call 2: construct request using schema
    │   LLM outputs: {amount: 2500, currency: "GBP", customer_id: "cust_123"}
@@ -528,7 +535,17 @@ response = agent.chat('Send a welcome email to the new customer')
 | `api` | Name of the API |
 | `version` | API version string |
 | `description` | What this API does — helps LLMs decide whether to explore its tools |
-| `tools` | Array of tool entries (url, method, name, description, tags) |
+| `tools` | Array of tool entries (see below) |
+
+**Tool entry fields** (each element in the `tools` array):
+
+| Field | Required | Purpose |
+|---|---|---|
+| `url` | Yes | Endpoint path |
+| `method` | Yes | HTTP method (GET, POST, etc.) |
+| `name` | Yes | Short human-readable tool name |
+| `description` | Yes | What the tool does |
+| `tags` | No | Tags for filtering (defaults to empty array) |
 
 **Per-endpoint fields** (`OPTIONS /route` response):
 
@@ -693,7 +710,7 @@ This is a transport-level concern, not a HALO-specific one. Any source of tool d
 
 - **TLS** — ensures schema responses are not tampered with in transit
 - **Schema signing** — HALO's `trust.signed` and `trust.jwks` fields (section 6.3) allow cryptographic verification of schema integrity
-- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.6)
+- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.6 in the 0.2.0 spec; now section 9.1)
 
 ### 9.4 Prompt Injection via Schema Fields
 
