@@ -853,7 +853,7 @@ def register_options_handlers(app, schemas: dict):
 
 ### 12.4 Complete Server Example
 
-The example below is annotated to show exactly where each HALO field comes from. Tags and the tool description are the two fields most commonly misunderstood.
+The example below is annotated to show exactly where each HALO field comes from.
 
 ```python
 from halo_fastapi import HaloRegister
