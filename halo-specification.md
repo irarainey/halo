@@ -243,6 +243,7 @@ Accept: application/llm+json
 {
   "api": "Example Payments API",
   "version": "2.1.0",
+  "description": "Payment processing, customer management, and communications for the Example platform.",
   "tools": [
     { "url": "/api/payments/charge",   "name": "charge",  "description": "Charge a payment method",          "tags": ["payments", "write"] },
     { "url": "/api/payments/refund",   "name": "refund",  "description": "Refund a previous charge",          "tags": ["payments", "write"] },
@@ -253,7 +254,7 @@ Accept: application/llm+json
 }
 ```
 
-The agent now has a complete capability map from a single cheap call. Tags are free-form strings. The API owner defines the taxonomy. Nothing needs to be registered centrally.
+The `description` field on the manifest gives the LLM (or a multi-API orchestrator) enough context to decide whether this API is relevant to the current task before examining individual tools.
 
 ### 3.2 Tag Filtering
 
@@ -266,9 +267,13 @@ OPTIONS /?tags=payments
 # Discover only safe read operations
 OPTIONS /?tags=read
 
-# Discover tools matching multiple tags
+# Discover tools matching any of the specified tags (OR semantics)
 OPTIONS /?tags=payments,read
 ```
+
+Tag filtering is most useful when the agent is **pre-configured** with the tags it cares about — a payment agent calls `OPTIONS /?tags=payments` and never sees unrelated tools. For general-purpose agents discovering an unknown API, the unfiltered manifest from `OPTIONS /` is lightweight (names, descriptions, and tags only — no full schemas) and the LLM can select relevant tools directly from the response without a second filtered call.
+
+> **Note on API design:** Well-designed microservices following domain-driven design naturally have narrow, focused tool surfaces. A payments service exposes payment operations; a customer service exposes customer operations. For these APIs, tag filtering may be unnecessary — the API surface is already scoped by design. Tag filtering becomes more valuable for larger monolithic APIs or APIs that span multiple domains.
 
 This solves three problems simultaneously:
 
@@ -314,45 +319,63 @@ The LLM never learns that restricted tools exist.
 
 ### 3.5 Two-Phase Lazy Loading
 
+Lazy loading separates tool *selection* from tool *invocation*. The manifest provides enough information (name, description, tags) for the LLM to choose which tool is relevant. The full schema (input parameters, auth, effects) is fetched only after selection, and a second LLM call constructs the actual request using the schema.
+
 ```
 Agent starts
    │
-   ├── OPTIONS /?tags=payments     ← cheap — names, descriptions, and tags
+   ├── OPTIONS /?tags=payments     ← manifest: names, descriptions, tags
    │   ← { tools: [charge, refund] }
    │
-   │   LLM receives: "Charge customer £25"
-   │   LLM selects:  charge
+   │   LLM call 1: "Charge customer £25"
+   │   LLM selects: charge (based on name + description)
    │
-   ├── OPTIONS /payments/charge    ← lazy — only when selected
-   │   ← { full schema }
+   ├── OPTIONS /payments/charge    ← full schema: input, auth, effects
+   │   ← { input: {amount, currency, customer_id}, auth: bearer }
+   │
+   │   LLM call 2: construct request using schema
+   │   LLM outputs: {amount: 2500, currency: "GBP", customer_id: "cust_123"}
    │
    └── POST /payments/charge       ← actual call — direct, no proxy
        ← { charge_id, status }
 ```
 
-Three HTTP calls total. Two OPTIONS, one POST. No registry, no MCP server. The agent still needs the base URL configured, but no per-tool definitions or framework-specific wiring is required.
+Four interactions: manifest fetch, tool selection (LLM), schema fetch, request construction (LLM) + invocation. On subsequent calls to the same tool, the schema is cached and only the second LLM call is needed.
 
 ### 3.6 Intent-Based Filtering
 
+For general-purpose agents that don't know which tools are relevant in advance, the manifest itself provides enough information for the LLM to select:
+
 ```python
 async def discover_for_task(task: str, base_url: str) -> list:
-    # Step 1: fetch manifest only — just names and tags, very cheap
+    # Step 1: fetch manifest — names, descriptions, and tags only
     manifest = await options(base_url)
-    all_tags = extract_unique_tags(manifest)
 
-    # Step 2: ask the LLM which tags are relevant
+    # Step 2: ask the LLM which tools are relevant to the task
     relevant = await llm.invoke(f"""
         Task: "{task}"
-        Available categories: {all_tags}
-        Return only relevant category names as JSON array.
+        Available tools: {manifest['tools']}
+        Return only the URLs of relevant tools as a JSON array.
         """)
 
-    # Step 3: fetch only the tools that match
-    filtered = await options(base_url, tags=relevant)
-
-    # Step 4: lazy-load schemas only for filtered tools
-    return [await options(t['url']) for t in filtered['tools']]
+    # Step 3: lazy-load full schemas only for selected tools
+    return [await options(url) for url in relevant]
 ```
+
+Two calls per selected tool: one manifest fetch, then one schema fetch per tool the LLM chose. No redundant filtered discovery call — the manifest is lightweight enough for the LLM to reason over directly.
+
+### 3.7 Caching
+
+The HTTP call costs described above are cold-start costs. In practice, APIs do not change frequently, and both manifests and per-endpoint schemas should be cached at the agent level.
+
+The `HaloClient` reference implementation caches schemas in memory — `get_tool()` fires OPTIONS once per path per session. Implementations should also support HTTP-level caching using standard mechanisms:
+
+- **`Cache-Control`** — the server can set `max-age` on OPTIONS responses to indicate how long schemas remain valid
+- **`ETag` / `If-None-Match`** — the client caches schemas with their ETag and revalidates with `If-None-Match` on subsequent requests. If unchanged, the server returns `304 Not Modified` with no body
+
+With caching in place, the common-case flow for a warm agent is: zero HTTP calls for cached schemas, one LLM call to construct the request, one HTTP call to invoke the endpoint. The multi-call lazy loading sequence only applies on first use or after cache invalidation.
+
+> **Protocol recommendation:** Server implementations should set `Cache-Control` and `ETag` headers on `application/llm+json` responses. This is standard HTTP behaviour and requires no HALO-specific mechanism.
 
 ---
 
