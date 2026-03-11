@@ -209,6 +209,20 @@ An OpenAPI spec is the same document regardless of who requests it. There is no 
 
 > **The bottom line:** OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 12.7) for teams transitioning between them.
 
+### 2.5 Where HALO Applies — and Where It Does Not
+
+Consumer LLM clients — ChatGPT, GitHub Copilot, Claude Desktop, Cursor, Windsurf — are coupled to MCP (or proprietary equivalents) for tool integration. HALO cannot be used directly with these clients. They do not support arbitrary HTTP tool-calling protocols, and there is no mechanism to add one.
+
+**HALO's primary audience is developer-built agent systems** — applications where the developer controls the agent runtime and chooses how tools are discovered and invoked. This includes:
+
+- Custom agents built with Semantic Kernel, LangChain, Microsoft Agent Framework, or LlamaIndex
+- Backend agent orchestration and multi-agent systems
+- Server-side automation where agents call APIs programmatically
+
+For consumer client compatibility, the MCP bridge pattern (described in section 1.3) provides a path: a lightweight MCP server that reads its tool definitions from HALO schemas at runtime rather than maintaining them as hand-written artifacts. This gives last-mile clients like Copilot and Claude Desktop access to HALO-described APIs through MCP, while the API owner maintains a single source of truth via HALO. The MCP server becomes a thin protocol translator with no hand-written tool definitions to maintain.
+
+> **Honest limitation:** HALO cannot bypass the MCP coupling in consumer clients. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
+
 ---
 
 ## 3. Capability Discovery and Filtering
