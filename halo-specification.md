@@ -2,7 +2,7 @@
 
 **`application/llm+json`**
 
-*Self-Describing APIs for LLM Agents — Without MCP*
+*Self-Describing APIs for LLM Agents*
 
 **Version: 0.3.0-draft**
 
@@ -69,7 +69,7 @@ The alternative — embedding MCP directly inside the existing API — avoids th
 
 > **Note on in-process MCP:** MCP supports an in-process stdio transport that avoids the network hop and sidecar deployment. In this mode the latency and failure-point arguments in section 1.4 do not apply. However, the architecture concern remains — the MCP protocol layer is still embedded in (or tightly coupled to) the API process, and the tool descriptions are still maintained as separate artifacts from the code that handles requests. Notably, HALO and MCP are not mutually exclusive in this scenario: a stdio MCP server could consume HALO schemas at runtime — reading tool definitions from the API's own OPTIONS endpoints rather than maintaining them as hand-written artifacts. This would give the MCP server live, drift-free tool definitions while preserving the MCP transport for clients that require it.
 
-> **The MCP dilemma:** With MCP you face an unavoidable choice — either maintain a separate service and accept the operational overhead, or embed MCP in your API and accept the separation of concerns violation. There is no clean option. HALO dissolves this dilemma entirely. An OPTIONS handler is not a foreign concern bolted onto the API — it is the API describing itself using a standard HTTP mechanism it already supports. No new protocol layer is introduced. No new service is required. Domain logic and self-description are not two separate concerns: every well-designed API should be able to answer the question "how do I call you?"
+> **The MCP dilemma:** For thin-wrapper MCP servers that map 1:1 to existing API endpoints, you face an unavoidable choice — either maintain a separate service and accept the operational overhead, or embed MCP in your API and accept the separation of concerns violation. HALO targets this specific space. An OPTIONS handler is not a foreign concern bolted onto the API — it is the API describing itself using a standard HTTP mechanism it already supports. No new protocol layer is introduced. No new service is required. For MCP servers that do real work — reshaping API surfaces, composing multiple calls, or serving consumer clients that require MCP — HALO is complementary, not a replacement (see section 2.5).
 
 ### 1.4 The Proxy Problem
 
@@ -113,6 +113,8 @@ Accept: application/llm+json
 ```
 
 Servers that do not implement HALO return a 406 or their standard OPTIONS response. No conflict. No breakage.
+
+> **Media type note:** `application/llm+json` is not a registered IANA media type. It is a custom media type used by this specification as a convention. IANA registration would be a future step if the protocol sees broader adoption. In practice, custom media types with the `+json` suffix are widely used and well-handled by HTTP infrastructure.
 
 ### 2.3 The Schema Response
 
@@ -369,7 +371,7 @@ The OPTIONS response describes the authentication shape required. Actual credent
 
 ### 4.2 Auth-Gated Schemas
 
-For APIs where the tool list itself is sensitive, credentials can be required to retrieve the schema. When the same token is valid for both discovery and the actual call, the schema signals this with `"already": true`.
+For APIs where the tool list itself is sensitive, credentials can be required to retrieve the schema (see section 9.1).
 
 ### 4.3 Agent Credential Map
 
@@ -490,7 +492,7 @@ response = agent.chat('Send a welcome email to the new customer')
 
 ### 6.2 LLM-Native Fields
 
-These fields have no equivalent in OpenAPI or existing standards. They exist solely to improve LLM reasoning and routing.
+These fields exist to improve LLM reasoning and routing. Most have no direct equivalent in OpenAPI or MCP tool schemas (see section 2.4 for a detailed comparison).
 
 | Field | Purpose |
 |---|---|
@@ -522,42 +524,47 @@ These fields have no equivalent in OpenAPI or existing standards. They exist sol
 
 ## 7. Skills vs the OPTIONS Protocol
 
-Skills — blocks of text injected into context describing how the LLM should behave — are the most common lightweight alternative to formal tool registration. Understanding where each approach belongs is critical to building a well-structured agent system.
+Skills — structured descriptions of business rules, domain knowledge, and tool orchestration logic — are an increasingly important layer in agent architecture. Understanding where skills and protocol-level tool description each belong is critical to building a well-structured agent system.
 
 ### 7.1 Honest Comparison
 
+For most dimensions, skills win. They are faster to create, more expressive, and more flexible. The protocol's advantages are narrow but important: structural accuracy, automated auth detection, and explicit failure modes.
+
 | Dimension | Skills | OPTIONS Protocol | Winner |
 |---|---|---|---|
-| Implementation effort | Write text — minutes | Add OPTIONS handler — hours | Skills win initially |
-| Maintenance over time | Manual — drifts silently | Structural schema cannot drift; LLM fields (`why`, `tags`) still manual | Protocol wins at scale |
-| Accuracy | As good as the author | Structural fields always correct — derived from code. LLM hints (`why`, `effects`) are hand-written but co-located with the model | Protocol wins |
-| Auth description | Prose — easy to get wrong | Detected and typed automatically | Protocol wins |
-| Schema changes | Someone must update manually | Structural changes reflect instantly — same deploy. LLM metadata changes require a code edit to the model's metadata annotations | Protocol wins |
-| Token cost | All loaded upfront always | Lazy, filtered, on demand | Protocol wins |
-| Validation | None — it is text | Testable in CI against live endpoint | Protocol wins |
-| Failure mode | Silent incorrect calls | Explicit 400/422 with structured error | Protocol wins |
-| Behavioural guidance | Natural — text is expressive | Not possible — schemas are structural | Skills win |
+| Implementation effort | Write text — minutes | Add OPTIONS handler — hours | Skills |
+| Expressiveness | Natural language — can capture business rules, edge cases, judgment | Structural JSON schema — mechanical fields only | Skills |
+| Multi-source orchestration | Can compose tools from APIs, MCP servers, scripts, and other sources into cohesive workflows | Describes individual HTTP endpoints only | Skills |
+| Domain knowledge | SMEs can draft and maintain skills without touching code | Requires developer involvement for LLM-native fields | Skills |
+| Behavioural guidance | Natural — text is expressive | Not possible — schemas are structural | Skills |
+| Structural accuracy | As good as the author — can drift silently | Structural fields always correct — derived from code | Protocol |
+| Auth description | Prose — easy to get wrong | Detected and typed automatically | Protocol |
+| Validation | None — it is text | Testable in CI against live endpoint | Protocol |
+| Failure mode | Silent incorrect calls | Explicit 400/422 with structured error | Protocol |
+| Token cost | All loaded upfront always | Lazy, filtered, on demand | Protocol |
 
-### 7.2 The Drift Problem Is Worse Than It Looks
+### 7.2 Skills as an Abstraction Layer
 
-Skills fail silently and at the worst possible time. The API changes, the skill doesn't, and the LLM confidently calls the endpoint with stale parameter names. The failure surfaces as incorrect agent behaviour — not as a schema error — and requires log forensics to diagnose.
+The industry is moving towards skills as a higher-level abstraction above raw tool definitions. In this model, skills capture business rules and domain knowledge, and orchestrate tools from multiple sources — API endpoints, MCP servers, scripts — behind a single cohesive interface. The LLM interacts with the skill, not directly with the underlying tools.
 
-When implemented natively, the OPTIONS protocol cannot drift *structurally* because the schema is derived from the same code that handles requests. In a framework like FastAPI, the Pydantic model that validates the incoming request is the same model that generates the OPTIONS response. In other languages, the same principle applies whenever the schema is generated from the route and type definitions rather than maintained as a separate artifact. If the code changes, the structural schema changes atomically with it in the same deployment.
+In this architecture, the drift concern changes shape. When a skill mediates between the LLM and the underlying tools, the separation between skill author (often a domain expert) and tool implementer (a developer) becomes a deliberate decoupling — not an accidental liability. The skill author describes *what should happen* in business terms; the developer ensures the tools *work correctly* at the mechanical level.
 
-> **Honest caveat:** HALO's LLM-native fields — `why`, `tags`, `effects`, `next`, and `examples` — are hand-written metadata. These can drift from reality in the same way any documentation can. The difference is that they are co-located with the code that defines the endpoint, making staleness visible during code review. Structural fields (inputs, outputs, types, constraints, auth) are auto-derived in implementations that support it and cannot drift.
+HALO's LLM-native fields (`why`, `effects`, `next`) occupy the space between these two layers. In a skills-first architecture, these fields may be less relevant to the LLM — which sees skills, not raw tools — but remain valuable in the developer loop: they document the API's behaviour for the skill author, and they provide structured metadata that skill orchestration engines can consume programmatically.
+
+> **Where HALO fits in a skills-first world:** HALO describes what each API endpoint does, mechanically and precisely. Skills describe what the agent should do, contextually and expressively. When skills orchestrate HALO-described tools, the combination gives the skill author a precise, drift-free contract to build on — rather than prose documentation that may be stale.
 
 ### 7.3 Where Each Belongs
 
 | Approach | What It Handles |
 |---|---|
-| Skills | Behavioural guidance and judgment — how to handle edge cases, what tone to use, when to escalate. Things that cannot be expressed as a JSON schema. |
-| OPTIONS Protocol | Mechanical capability — what the agent can do, exactly how to do it, what auth it needs, what side effects it has. Things that must be precise and must stay in sync with the live system. |
+| Skills | Business rules, domain knowledge, multi-tool orchestration, judgment, edge cases, tone. Things that require context, expressiveness, and cross-tool coordination. |
+| OPTIONS Protocol | Mechanical capability — what a single API endpoint does, exactly how to call it, what auth it needs, what side effects it has. Things that must be precise and must stay in sync with the live system. |
 
-> **Key principle:** Behavioural guidance belongs in skills. API contracts belong in schemas. When both are in skills the system is fragile. When both are in schemas the system is rigid. The combination is where it gets genuinely robust.
+> **Key principle:** Skills and schemas are not competing alternatives — they operate at different layers. Skills describe *what the agent should do*. Schemas describe *what the API can do*. When both are in skills the system is fragile at the mechanical layer. When both are in schemas the system is rigid at the behavioural layer. The combination is where it gets robust.
 
 ### 7.4 Migration Path
 
-Most teams will start with skills because the upfront cost is lower. The natural migration path is to start with skills for early prototyping and migrate to OPTIONS as APIs stabilise and the maintenance cost of skills becomes visible in production. The migration is straightforward — the skill is essentially prose describing what the OPTIONS schema will contain formally.
+Most teams will start with skills because the upfront cost is lower and the expressiveness is immediate. As APIs stabilise, the structural accuracy and testability of the OPTIONS protocol become more valuable — particularly for the mechanical contract that skills rely on. The migration is not skills *to* protocol but skills *on top of* protocol: the skill continues to describe business logic, while the protocol ensures the underlying API contract is always correct.
 
 ---
 
@@ -669,7 +676,7 @@ HALO replaces the tool discovery and invocation layer — not the full scope of 
 | Auth in tool config | Auth shape served with schema, secrets in agent credential map |
 | Hardcoded retry logic | `resilience` fields declare the API's own retry contract |
 | Workflow definitions | `next` field creates emergent workflows from API metadata |
-| Skill drift | Structural schema cannot drift — same artifact as the code that validates requests. LLM-native hints are co-located with the model. |
+| Skill separation | In a skills-first architecture, the separation between skill (business logic) and tool (mechanical contract) is a deliberate decoupling benefit, not a drift liability. HALO provides the precise contract that skills build on (see section 7.2). |
 
 ---
 
@@ -697,6 +704,7 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 | HAL (Hypertext Application Language) | Hypermedia links in response bodies for API navigation. No LLM-native fields. Complementary. |
 | OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native reasoning fields, is served as a monolithic document with no standard subsetting mechanism, and requires non-trivial transformation for LLM consumption (`$ref` resolution, nesting traversal, parameter merging). See section 2.4 for a detailed comparison. |
 | agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent to HALO — covers tool schemas, authentication flows, and API-level rate limits. However, it is a static file that must be maintained separately from the code, inheriting drift risk for structural fields. HALO’s per-endpoint OPTIONS approach derives structural schemas from the code at runtime. |
+| MCP (Model Context Protocol) | Comprehensive agent protocol covering tools, resources, prompts, sampling, and sessions. HALO targets only the tool discovery and invocation layer — the dominant MCP use case. HALO and MCP are complementary: an MCP server can consume HALO schemas at runtime for drift-free tool definitions (see section 1.3). For consumer clients coupled to MCP (section 2.5), HALO serves as a backing store, not a replacement. |
 | HAL MCP Server | An MCP server wrapping HTTP APIs for LLMs. Adds the MCP layer rather than removing it. |
 | GraphQL Introspection | Runtime schema discovery — genuinely live and self-describing, but locked to GraphQL. HALO fills this gap for REST. |
 | HATEOAS | Next-action links in responses. Spiritually similar to HALO's `next` field but designed for human navigation. |
@@ -1083,7 +1091,7 @@ Both adapters follow the same pattern: discover via `HaloClient`, pass the clien
 
 **The Convention**
 
-Send `HTTP OPTIONS` with `Accept: application/llm+json` to any API endpoint. Receive a compact JSON schema describing what it does, how to call it, what auth it needs, what effects it has, and what tags categorise it. The API describes itself. No MCP. No registry. No shim.
+Send `HTTP OPTIONS` with `Accept: application/llm+json` to any API endpoint. Receive a compact JSON schema describing what it does, how to call it, what auth it needs, what effects it has, and what tags categorise it. The API describes itself — no separate tool definitions to maintain.
 
 **The Loop**
 
@@ -1096,11 +1104,11 @@ Send `HTTP OPTIONS` with `Accept: application/llm+json` to any API endpoint. Rec
 
 **Skills vs Protocol**
 
-Skills describe behaviour and judgment — use them for that. The OPTIONS protocol describes mechanical API capability — use it for that. Skills drift silently. Structural schemas derived from code cannot drift. LLM-native fields are co-located with the model but remain hand-written. Use both, for the right purpose.
+Skills and schemas operate at different layers. Skills describe business rules, domain knowledge, and multi-tool orchestration — they win on expressiveness, flexibility, and accessibility to domain experts. The OPTIONS protocol describes mechanical API capability with structural accuracy that cannot drift. The migration is not skills *to* protocol but skills *on top of* protocol.
 
 **What it removes**
 
-MCP server · Tool registry · Structural schema drift · Skill drift · Auth sync · Sidecar processes · Static tool definitions · Upfront token cost · Silent failures · Extra network hop · Distributed call chain complexity
+Sidecar MCP servers (for thin wrappers) · Hand-written tool definitions · Structural schema drift · Auth sync · Upfront token cost · Silent failures
 
 **What it adds**
 
