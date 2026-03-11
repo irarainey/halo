@@ -39,7 +39,7 @@ Settings are managed via Pydantic Settings. The `.env` file in the repository ro
 
 | Method | Path | Description | Tags |
 |---|---|---|---|
-| POST | `/api/weather` | Return current weather conditions and forecast for a city | weather, read |
+| GET | `/api/weather` | Return current weather conditions and forecast for a city | weather, read |
 | GET | `/api/books` | Search the book catalogue by title/author with optional genre filter | books, read |
 | POST | `/api/books` | Add a new book to the catalogue | books, write |
 | GET | `/api/inventory` | Check stock levels with optional category and low-stock filters | inventory, read |

@@ -33,11 +33,14 @@ _security = security.HTTPBearer()
 # -- Weather ------------------------------------------------------------------
 
 
-@app.post("/api/weather", response_model=models.WeatherResponse)
-async def get_weather(body: models.WeatherRequest, _token: str = fastapi.Depends(_security)):
+@app.get("/api/weather", response_model=models.WeatherResponse)
+async def get_weather(
+    params: models.WeatherRequest = fastapi.Depends(),  # noqa: B008
+    _token: str = fastapi.Depends(_security),
+):
     """Return current weather conditions and forecast for a given city."""
     records = data.weather()
-    match = next((r for r in records if r["city"].lower() == body.city.lower()), None)
+    match = next((r for r in records if r["city"].lower() == params.city.lower()), None)
     if not match:
         available = ", ".join(r["city"] for r in records)
         raise fastapi.HTTPException(status_code=404, detail=f"City not found. Available cities: {available}")

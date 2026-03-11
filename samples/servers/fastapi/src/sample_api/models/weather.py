@@ -6,7 +6,7 @@ import pydantic
 
 
 class WeatherRequest(pydantic.BaseModel):
-    """Request body for the weather lookup endpoint. Accepts a city name."""
+    """Query parameters for the weather lookup endpoint. Accepts a city name."""
 
     city: str = pydantic.Field(..., description="City name to look up weather for, e.g. 'London', 'Tokyo'")
 
