@@ -195,7 +195,7 @@ An OpenAPI spec is the same document regardless of who requests it. There is no 
 | Industry adoption | Ubiquitous | New | OpenAPI wins |
 | Complementary use | Can coexist with HALO | Can coexist with OpenAPI | Not mutually exclusive |
 
-> **The bottom line:** OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 11.7) for teams transitioning between them.
+> **The bottom line:** OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 12.7) for teams transitioning between them.
 
 ---
 
@@ -603,7 +603,51 @@ An API that serves `application/llm+json` from OPTIONS is making a declaration: 
 
 ---
 
-## 9. What This Replaces
+## 9. Security Considerations
+
+HALO's OPTIONS handlers expose API metadata — endpoint paths, parameter names and types, auth requirements, rate limits, side effects, and workflow hints. This is the same information carried by any tool description mechanism (OpenAPI specs, MCP tool definitions, skill documents). The security implications are not unique to HALO, but they are worth calling out explicitly.
+
+### 9.1 Auth-Gate Discovery in Production
+
+If the API itself requires authentication, the OPTIONS handlers should too. An unauthenticated OPTIONS endpoint on an authenticated API creates an information asymmetry — callers who cannot invoke endpoints can still discover them.
+
+The mitigation is straightforward: require the same credentials for discovery that the API requires for invocation. HALO's auth-aware discovery (section 3.4) already supports this — when credentials are passed with the OPTIONS request, the manifest reflects only what those credentials permit. In production, this should be the default, not an optional enhancement.
+
+> **Recommendation:** If your API requires authentication, require it on OPTIONS as well. The `tool_filter` callback in `HaloRegister` (or equivalent in other implementations) can enforce this at the handler level. This is the same principle as any production system — do not expose metadata to callers who cannot act on it.
+
+### 9.2 Information Disclosure
+
+Without auth-gating, OPTIONS handlers expose the full API surface to any client that sets `Accept: application/llm+json`. This includes endpoint paths, parameter schemas, auth types, rate limits, and — via `effects.undo` and `next` — relationships between endpoints that reveal internal workflow logic.
+
+This is not a HALO-specific concern. An OpenAPI spec, an MCP server's tool list, or a skill document all expose the same information. The difference is that HALO serves this information from the live API rather than a separate file or service. Auth-gating OPTIONS requests (section 9.1) addresses this directly.
+
+### 9.3 Schema Poisoning
+
+If a HALO-compliant API is compromised or intercepted, the `next` and `effects.undo` fields could redirect an agent to malicious endpoints. The `why` and `description` fields could be altered to influence tool selection in unintended ways.
+
+This is a transport-level concern, not a HALO-specific one. Any source of tool definitions consumed by an LLM — MCP tool descriptions, OpenAPI specs, skill documents — is subject to the same risk if the source is compromised. The mitigations are standard:
+
+- **TLS** — ensures schema responses are not tampered with in transit
+- **Schema signing** — HALO's `trust.signed` and `trust.jwks` fields (section 6.3) allow cryptographic verification of schema integrity
+- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.7)
+
+### 9.4 Prompt Injection via Schema Fields
+
+The `why`, `description`, and `examples` fields are free text consumed by the LLM. A malicious or compromised API could embed adversarial instructions in these fields that influence agent behaviour beyond the intended scope — for example, instructing the LLM to ignore its system prompt or call unrelated tools.
+
+This is inherent to LLM tool consumption, not specific to HALO. Every tool description mechanism — MCP, OpenAPI, LangChain tools, skills — carries free-text fields that the LLM interprets. The mitigations are the same as for any LLM system that consumes external input:
+
+- Treat schema content as untrusted input in the agent's prompt construction
+- Apply output filtering and validation on the agent side
+- Use auth-gated discovery to ensure schemas only come from trusted, authenticated sources
+
+### 9.5 Rate Limiting Discovery
+
+OPTIONS requests are cheap to serve but could be abused for endpoint enumeration or discovery-based denial of service. Standard rate limiting applies — the same controls used for any API endpoint. HALO's OPTIONS handlers appear in existing access logs and can be rate-limited separately from invocation using standard middleware.
+
+---
+
+## 10. What This Replaces
 
 | Current World | With HALO |
 |---|---|
@@ -622,9 +666,9 @@ An API that serves `application/llm+json` from OPTIONS is making a declaration: 
 
 ---
 
-## 10. Prior Art and Naming
+## 11. Prior Art and Naming
 
-### 10.1 The Name: HAL vs HALO
+### 11.1 The Name: HAL vs HALO
 
 The most important naming consideration is HAL — Hypertext Application Language — a well-established hypermedia standard from 2012 with the media type `application/hal+json`. The similarity to HALO and `application/llm+json` is close enough to require explicit differentiation.
 
@@ -639,7 +683,7 @@ The most important naming consideration is HAL — Hypertext Application Languag
 
 HAL and HALO are not competing standards. A REST API using HAL for hypermedia navigation could simultaneously implement HALO for LLM capability discovery. They operate at different layers and serve different consumers.
 
-### 10.2 Related Standards and Prior Art
+### 11.2 Related Standards and Prior Art
 
 | Standard | Relationship to HALO |
 |---|---|
@@ -661,9 +705,9 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 
 ---
 
-## 11. halo-fastapi: Server-Side Implementation
+## 12. halo-fastapi: Server-Side Implementation
 
-### 11.1 Overview
+### 12.1 Overview
 
 `halo-fastapi` is a PyPI package that implements the HALO protocol for FastAPI servers. It is one implementation of the protocol — the same convention could be implemented as a Django Ninja plugin, a Flask extension, a Rails gem, or an Express middleware. `halo-fastapi` is the Python reference implementation.
 
@@ -678,11 +722,11 @@ The package exposes two primary objects:
 
 Together they are the complete HALO integration: `HaloRegister` makes an API HALO-compliant, `HaloClient` makes an agent capable of consuming any HALO-compliant API.
 
-### 11.2 The HaloRegister Plugin
+### 12.2 The HaloRegister Plugin
 
 A single line added to any FastAPI application makes every route HALO-compliant. The plugin introspects the existing application at startup and derives everything it needs from metadata that already exists. No routes change. No models change. No decorators are required.
 
-### 11.3 What HaloRegister(app) Actually Does
+### 12.3 What HaloRegister(app) Actually Does
 
 When `HaloRegister(app)` is called at startup, it performs the following steps automatically:
 
@@ -800,7 +844,7 @@ def register_options_handlers(app, schemas: dict):
 
 > **The complete picture:** `HaloRegister(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
 
-### 11.4 Complete Server Example
+### 12.4 Complete Server Example
 
 The example below is annotated to show exactly where each HALO field comes from. Tags and the tool description are the two fields most commonly misunderstood.
 
@@ -876,7 +920,7 @@ async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
 
 > **Tags rule:** Tags are the single most impactful field for agent performance. They determine which agents discover the tool at all. At minimum, every endpoint should have a domain tag (`payments`, `email`, `calendar`) and a `read`/`write` tag. Without tags, the tool appears in all discovery requests regardless of relevance.
 
-### 11.5 What halo-fastapi Derives Automatically
+### 12.5 What halo-fastapi Derives Automatically
 
 | Field | Source |
 |---|---|
@@ -893,7 +937,7 @@ async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
 
 > **Zero required additions:** Every field HALO needs can be derived from existing route definitions, Pydantic models, docstrings, and dependency injection. The only optional enrichments are the LLM-native fields — `why`, `tags`, `effects`, and `next` — which are additive improvements, not baseline requirements.
 
-### 11.6 Implementing HALO in Other Languages
+### 12.6 Implementing HALO in Other Languages
 
 The following are minimal reference implementations showing that the protocol requires no special library — any HTTP server can implement it by adding a single OPTIONS handler per route. `halo-fastapi` automates this for FastAPI; these examples show the manual equivalent.
 
@@ -929,17 +973,17 @@ public IActionResult ChargeSchema() {
 }
 ```
 
-### 11.7 OpenAPI Bridge
+### 12.7 OpenAPI Bridge
 
 For teams with existing OpenAPI specs, a bridge auto-generates `application/llm+json` responses by transforming the existing schema — zero manual work for the structural fields. The LLM-native fields (`why`, `tags`, `effects`) must still be added manually as they have no OpenAPI equivalent.
 
 ---
 
-## 12. halo-fastapi: Client-Side Agent Adapter
+## 13. halo-fastapi: Client-Side Agent Adapter
 
 The same `halo-fastapi` package provides `HaloClient` — the client-side adapter that discovers any HALO-compliant API, caches schemas, injects credentials, and invokes tools directly.
 
-### 12.1 HaloClient Core
+### 13.1 HaloClient Core
 
 ```python
 from halo_fastapi import HaloClient
@@ -960,7 +1004,7 @@ schema = await client.get_tool('/api/payments/charge')
 result = await client.invoke('/api/payments/charge', body={'amount': 1000})
 ```
 
-### 12.2 What HaloClient Does Internally
+### 13.2 What HaloClient Does Internally
 
 When `discover()` is called, `HaloClient` performs the following sequence:
 
@@ -971,7 +1015,7 @@ When `discover()` is called, `HaloClient` performs the following sequence:
 5. On `invoke(path, body)`, fetches the schema (cached), injects credentials from the credential map based on the target domain, and fires the real HTTP call using the method and URL from the schema
 6. Failed requests are retried with exponential backoff on connection errors, HTTP 429, and 5xx responses
 
-### 12.3 Credential Injection
+### 13.3 Credential Injection
 
 For the common case of a single API with a bearer token, use the `bearer_token` convenience parameter:
 
@@ -997,7 +1041,7 @@ Supported credential types:
 | `apikey` | Injects the value into the named header (default `X-API-Key`) |
 | `basic` | Injects `Authorization: Basic {value}` |
 
-### 12.4 Framework Integration
+### 13.4 Framework Integration
 
 `halo-fastapi` includes adapters for Microsoft Agent Framework and Semantic Kernel.
 
@@ -1028,7 +1072,7 @@ Both adapters follow the same pattern: discover via `HaloClient`, pass the clien
 
 ---
 
-## 13. Summary
+## 14. Summary
 
 **The Convention**
 
