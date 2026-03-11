@@ -660,17 +660,15 @@ HALO replaces the tool discovery and invocation layer — not the full scope of 
 
 | Current World | With HALO |
 |---|---|
-| MCP server process | OPTIONS handler runs inside the existing API — no sidecar, no separate deployment |
+| MCP server process (remote) | OPTIONS handler runs inside the existing API — no sidecar, no separate deployment. (When MCP is embedded in-process, both share the same deployment.) |
 | Separation of concerns violation | OPTIONS is a native HTTP mechanism — self-description is not a separate concern |
-| MCP proxy layer | Agent calls the API directly — no intermediate network hop |
-| Distributed call chain | Two-hop call path: agent to API. Failures immediately attributable. |
-| Tool registry | The API is the registry. Root OPTIONS returns the full manifest. |
+| MCP proxy layer (remote) | Agent calls the API directly — no intermediate network hop. (Embedded MCP also avoids the extra hop, but retains protocol coupling — see section 1.3.) |
+| Tool registry with hand-written definitions | The API is the registry. Root OPTIONS returns the full manifest. Tool definitions are derived from code, not maintained separately. (MCP also supports dynamic tool lists via `tools/list` and `list_changed` notifications — the difference is where the definitions originate, not whether they can update.) |
 | Schema files (OpenAPI) | Schema lives on the route itself, versioned with the code |
 | Structural schema drift | Eliminated for auto-derived fields — schema is generated from the code that handles requests. LLM-native fields (`why`, `tags`, `effects`) are co-located but still hand-written. |
 | Auth in tool config | Auth shape served with schema, secrets in agent credential map |
 | Hardcoded retry logic | `resilience` fields declare the API's own retry contract |
 | Workflow definitions | `next` field creates emergent workflows from API metadata |
-| Static tool definitions | Dynamic discovery — tools appear when APIs implement the convention |
 | Skill drift | Structural schema cannot drift — same artifact as the code that validates requests. LLM-native hints are co-located with the model. |
 
 ---
