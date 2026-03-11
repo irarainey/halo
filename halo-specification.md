@@ -10,6 +10,30 @@
 
 ---
 
+## Table of Contents
+
+**Part I — The HALO Protocol Specification**
+
+- [1. The Problem](#1-the-problem) — 1.1 How It Works Today · 1.2 The Drift Problem · 1.3 The Architecture Problem · 1.4 The Proxy Problem
+- [2. The Solution](#2-the-solution) — 2.1 The OPTIONS Verb · 2.2 The Activation Header · 2.3 The Schema Response · 2.4 Why Not Use OpenAPI? · 2.5 Where HALO Applies · 2.6 Error Responses
+- [3. Capability Discovery and Filtering](#3-capability-discovery-and-filtering) — 3.1 Root Discovery · 3.2 Tag Filtering · 3.3 Tag Conventions · 3.4 Auth-Aware Discovery · 3.5 Lazy Loading · 3.6 Intent-Based Filtering · 3.7 Caching
+- [4. Authentication](#4-authentication) — 4.1 Schema Shape · 4.2 Auth-Gated Schemas · 4.3 Credential Map
+- [5. Framework Integration](#5-framework-integration) — 5.1 Microsoft Agent Framework · 5.2 Semantic Kernel · 5.3 LangChain · 5.4 LlamaIndex · 5.5 Comparison
+- [6. Full Schema Specification](#6-full-schema-specification) — 6.1 Core Fields · 6.2 LLM-Native Fields · 6.3 Operational Fields
+- [7. Skills vs the OPTIONS Protocol](#7-skills-vs-the-options-protocol) — 7.1 Comparison · 7.2 Skills as Abstraction · 7.3 Where Each Belongs · 7.4 Migration
+- [8. Why This Is a Solid Foundation](#8-why-this-is-a-solid-foundation) — 8.1 Direct Call Path · 8.2 Conditional Guarantees · 8.3 Testability · 8.4 Additional Properties
+- [9. Security Considerations](#9-security-considerations) — 9.1 Auth-Gating · 9.2 Disclosure · 9.3 Schema Poisoning · 9.4 Prompt Injection · 9.5 Rate Limiting
+- [10. What This Replaces](#10-what-this-replaces)
+- [11. Prior Art and Naming](#11-prior-art-and-naming) — 11.1 HAL vs HALO · 11.2 Related Standards
+
+**Part II — The Python Reference Implementation**
+
+- [12. Server-Side Implementation](#12-halo-fastapi-server-side-implementation) — 12.1 Overview · 12.2 HaloRegister · 12.3 How It Works · 12.4 Server Example · 12.5 Auto-Derived Fields · 12.6 Other Languages · 12.7 OpenAPI Bridge
+- [13. Client-Side Agent Adapter](#13-halo-fastapi-client-side-agent-adapter) — 13.1 HaloClient · 13.2 Internals · 13.3 Credentials · 13.4 Framework Integration
+- [14. Summary](#14-summary)
+
+---
+
 ## Licence
 
 Protocol Specification: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
@@ -55,7 +79,7 @@ When API descriptions are maintained separately from the code — whether as Ope
 | Auth complexity | Auth handled separately from discovery, creating synchronisation problems |
 | Silent failures | Stale descriptions cause incorrect calls with no schema-level error |
 
-> **Core insight:** The API already knows everything about itself — inputs, outputs, auth, rate limits, side effects. The problem is that nothing asks it. Every secondary artifact that describes an API is a liability. The API itself is the only source of truth for its structural contract.
+The API already knows everything about itself — inputs, outputs, auth, rate limits, side effects. The problem is that nothing asks it. Every secondary artifact that describes an API is a liability. The API itself is the only source of truth for its structural contract.
 
 ### 1.3 The Architecture Problem
 
