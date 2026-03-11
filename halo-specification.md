@@ -90,6 +90,8 @@ HALO has no proxy layer. The LLM agent calls the API directly — OPTIONS to dis
 
 > **Protocol note:** Everything in Part I describes the HALO protocol itself — a convention that can be implemented in any language on any platform. Python, Node.js, Go, Java, .NET, Ruby — any HTTP server can implement HALO by following this specification. The protocol has no dependency on any specific runtime, framework, or library.
 
+> **Scope note:** HALO solves one specific problem: how an LLM agent discovers and invokes HTTP API tools. MCP is a broader protocol that also defines primitives for resources (read-only data sources), prompts (reusable interaction templates), sampling (server-initiated LLM completions), and a stateful session lifecycle. HALO does not attempt to replace these capabilities. In practice, tool discovery and invocation is the dominant use case in the MCP ecosystem — the majority of MCP servers expose tools as their primary or sole capability. HALO targets this use case directly, without the protocol and infrastructure overhead that MCP's broader feature set requires.
+
 HTTP has always had the mechanism to fix this. The OPTIONS method has existed since HTTP/1.1. Its semantic meaning is unambiguous: tell me what is possible at this endpoint. Its response body has never been standardised — which means it is effectively unclaimed territory.
 
 ### 2.1 The OPTIONS Verb
@@ -656,6 +658,8 @@ OPTIONS requests are cheap to serve but could be abused for endpoint enumeration
 ---
 
 ## 10. What This Replaces
+
+HALO replaces the tool discovery and invocation layer — not the full scope of protocols like MCP. MCP's resources, prompts, sampling, and session primitives are outside HALO's scope. For teams whose MCP usage is primarily tool-based (which accounts for the majority of MCP server implementations), HALO provides the same capability with less infrastructure.
 
 | Current World | With HALO |
 |---|---|
