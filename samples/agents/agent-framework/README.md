@@ -1,6 +1,6 @@
 # Sample: Agent Framework
 
-LLM agent application that consumes the [sample API](../api) via the HALO protocol using `halo-fastapi` and [Microsoft Agent Framework](https://github.com/microsoft/agents).
+LLM agent application that consumes the [sample API](../../servers/fastapi) via the HALO protocol using `halo-fastapi` and [Microsoft Agent Framework](https://github.com/microsoft/agents).
 
 The agent runs inside an Agent Framework DevUI server, providing a browser-based chat interface at `http://localhost:8080`.
 
@@ -45,7 +45,7 @@ uv sync --all-packages
 uv pip install -e samples/agents/agent-framework
 
 # Start the API in one terminal
-uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/api/src
+uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/servers/fastapi/src
 
 # Start the agent in another terminal
 cd samples/agents/agent-framework/src
@@ -86,9 +86,10 @@ samples/agents/agent-framework/
     │   └── halo_filter_tools.py # Filter-tools agent — discovers tools by tag
     └── utils/
         ├── __init__.py
+        ├── devserver.py   # PersistingDevServer with thread persistence
         └── logger.py      # Coloured console log formatter
 ```
 
 ## Licence
 
-[Apache 2.0](../../LICENSE)
+[Apache 2.0](../../../LICENSE)

@@ -1,6 +1,6 @@
 # Sample: Semantic Kernel
 
-LLM agent CLI that consumes the [sample API](../api) via the HALO protocol using `halo-fastapi` and [Semantic Kernel](https://github.com/microsoft/semantic-kernel).
+LLM agent CLI that consumes the [sample API](../../servers/fastapi) via the HALO protocol using `halo-fastapi` and [Semantic Kernel](https://github.com/microsoft/semantic-kernel).
 
 Provides an interactive command-line chat interface powered by [Rich](https://github.com/Textualize/rich).
 
@@ -35,7 +35,7 @@ uv sync --all-packages
 uv pip install -e samples/agents/semantic-kernel
 
 # Start the API in one terminal
-uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/api/src
+uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/servers/fastapi/src
 
 # Start the SK chat in another terminal
 cd samples/agents/semantic-kernel/src
@@ -74,4 +74,4 @@ samples/agents/semantic-kernel/
 
 ## Licence
 
-[Apache 2.0](../../LICENSE)
+[Apache 2.0](../../../LICENSE)
