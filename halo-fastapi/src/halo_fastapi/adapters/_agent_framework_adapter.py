@@ -80,7 +80,7 @@ class HaloAgentFrameworkAdapter:
 
         tools: list[agent_framework.FunctionTool] = []
         for entry in self._client.tools:
-            schema = await self._client.get_tool(entry.url)
+            schema = await self._client.get_tool(entry.url, method=entry.method or None)
             path = entry.url
 
             async def _invoke(

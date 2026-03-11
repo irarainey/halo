@@ -199,7 +199,7 @@ class HaloRegister:
         tool_filter: Callable[[requests.Request, str], bool] | None = None,
     ) -> None:
         self._app = app
-        self._schemas: dict[str, _types.HaloSchema] = {}
+        self._schemas: dict[str, list[_types.HaloSchema]] = {}
         self._endpoint_names: dict[str, str] = {}
         self._tool_filter = tool_filter
 
@@ -220,11 +220,12 @@ class HaloRegister:
             auth = _detect_auth(dependant)
 
             schema = _build_schema(route, auth)
-            self._schemas[route.path] = schema
+            self._schemas.setdefault(route.path, []).append(schema)
             self._endpoint_names[route.path] = route.endpoint.__name__
-            _logger.debug("Registered HALO schema for %s", route.path)
+            _logger.debug("Registered HALO schema for %s %s", schema.call.method, route.path)
 
-        _logger.info("HALO introspection complete — %d endpoint(s)", len(self._schemas))
+        total = sum(len(v) for v in self._schemas.values())
+        _logger.info("HALO introspection complete — %d schema(s) on %d path(s)", total, len(self._schemas))
 
     def _register_handlers(self) -> None:
         """Register OPTIONS handlers for each route and the root.
@@ -253,23 +254,26 @@ class HaloRegister:
 
             tools = []
             requested_tags = {t.strip() for t in tags.split(",")} if tags else None
-            for path, schema in schemas.items():
-                if requested_tags and not (requested_tags & set(schema.tags)):
-                    continue
-                if tool_filter and not tool_filter(request, path):
-                    continue
-                tools.append(
-                    _types.HaloToolEntry(
-                        url=path,
-                        name=endpoint_names.get(path, path.strip("/").split("/")[-1]),
-                        description=schema.description,
-                        tags=schema.tags,
+            for path, schema_list in schemas.items():
+                for schema in schema_list:
+                    if requested_tags and not (requested_tags & set(schema.tags)):
+                        continue
+                    if tool_filter and not tool_filter(request, path):
+                        continue
+                    tools.append(
+                        _types.HaloToolEntry(
+                            url=path,
+                            method=schema.call.method,
+                            name=endpoint_names.get(path, path.strip("/").split("/")[-1]),
+                            description=schema.description,
+                            tags=schema.tags,
+                        )
                     )
-                )
 
             manifest = _types.HaloManifest(
                 api=app.title or "",
                 version=app.version or "",
+                description=getattr(app, "description", None) or "",
                 tools=tools,
             )
             return responses.JSONResponse(
@@ -278,8 +282,8 @@ class HaloRegister:
             )
 
         # Per-route OPTIONS handlers.
-        for path, schema in schemas.items():
-            self._add_route_handler(path, schema)
+        for path, schema_list in schemas.items():
+            self._add_route_handler(path, schema_list)
 
     def _pop_options_route(
         self,
@@ -298,15 +302,15 @@ class HaloRegister:
                 return route.endpoint  # type: ignore[return-value]
         return None
 
-    def _add_route_handler(self, path: str, schema: _types.HaloSchema) -> None:
+    def _add_route_handler(self, path: str, schema_list: list[_types.HaloSchema]) -> None:
         """Register an OPTIONS handler for a single route."""
-        response_dict = schema.to_response_dict()
+        response_list = [s.to_response_dict() for s in schema_list]
         existing = self._pop_options_route(path)
 
         @self._app.options(path)
         async def _halo_route_options(
             request: requests.Request,
-            _response: dict[str, Any] = response_dict,
+            _response: list[dict[str, Any]] = response_list,
             _existing: Callable[..., Coroutine[Any, Any, responses.Response]] | None = existing,
         ) -> responses.Response:
             if request.headers.get("accept") != _constants.CONTENT_TYPE:

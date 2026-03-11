@@ -70,7 +70,7 @@ class HaloSemanticKernelAdapter:
         functions: list[KernelFunction] = []
 
         for entry in self._client.tools:
-            schema = await self._client.get_tool(entry.url)
+            schema = await self._client.get_tool(entry.url, method=entry.method or None)
             func = _make_invoke_func(self._client, entry.url, schema)
             kf = KernelFunction.from_method(func, plugin_name=plugin_name)
             functions.append(kf)

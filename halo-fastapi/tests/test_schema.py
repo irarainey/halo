@@ -370,7 +370,7 @@ class TestHaloRegister:
         assert resp.status_code == 204
 
     async def test_route_options_returns_schema(self) -> None:
-        """OPTIONS /api/books with HALO Accept returns the endpoint schema."""
+        """OPTIONS /api/books with HALO Accept returns the endpoint schema as an array."""
         app = _make_app()
 
         @app.get("/api/books")
@@ -388,9 +388,11 @@ class TestHaloRegister:
             )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["call"]["method"] == "GET"
-        assert data["call"]["url"] == "/api/books"
-        assert data["description"] == "List all books in the library."
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["call"]["method"] == "GET"
+        assert data[0]["call"]["url"] == "/api/books"
+        assert data[0]["description"] == "List all books in the library."
 
     async def test_route_options_without_accept_returns_204(self) -> None:
         """OPTIONS /api/books without HALO Accept returns 204."""
@@ -518,7 +520,8 @@ class TestHaloRegister:
                 headers={"Accept": _constants.CONTENT_TYPE},
             )
         data = resp.json()
-        assert data["auth"]["type"] == "bearer"
+        assert isinstance(data, list)
+        assert data[0]["auth"]["type"] == "bearer"
 
     async def test_content_type_header(self) -> None:
         """HALO responses use application/llm+json content type."""
@@ -557,10 +560,80 @@ class TestHaloRegister:
                 headers={"Accept": _constants.CONTENT_TYPE},
             )
         data = resp.json()
+        assert isinstance(data, list)
+        schema = data[0]
         # Empty fields should be stripped by to_response_dict.
-        assert "input" not in data
-        assert "output" not in data
-        assert "tags" not in data
+        assert "input" not in schema
+        assert "output" not in schema
+        assert "tags" not in schema
         # Populated fields remain.
-        assert "call" in data
-        assert "description" in data
+        assert "call" in schema
+        assert "description" in schema
+
+    async def test_multi_method_path(self) -> None:
+        """Multiple methods on the same path return an array with all schemas."""
+        app = _make_app()
+
+        @app.get("/api/items")
+        async def list_items() -> list[dict[str, str]]:
+            """List items."""
+            return []
+
+        @app.post("/api/items")
+        async def create_item(body: CreateItem) -> dict[str, str]:
+            """Create an item."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/api/items",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        methods = {s["call"]["method"] for s in data}
+        assert methods == {"GET", "POST"}
+
+    async def test_manifest_includes_description(self) -> None:
+        """Root manifest includes API description."""
+        app = _make_app(description="A test API for unit testing.")
+
+        @app.get("/api/test")
+        async def test_route() -> dict[str, str]:
+            """Test."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        assert data["description"] == "A test API for unit testing."
+
+    async def test_manifest_tool_entries_include_method(self) -> None:
+        """Tool entries in the manifest include the HTTP method."""
+        app = _make_app()
+
+        @app.post("/api/items")
+        async def create_item(body: CreateItem) -> dict[str, str]:
+            """Create an item."""
+            return {}
+
+        _schema.HaloRegister(app)
+        client = await _client(app)
+
+        async with client:
+            resp = await client.options(
+                "/",
+                headers={"Accept": _constants.CONTENT_TYPE},
+            )
+        data = resp.json()
+        assert data["tools"][0]["method"] == "POST"

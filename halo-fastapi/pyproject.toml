@@ -1,6 +1,6 @@
 [project]
 name = "halo-fastapi"
-version = "0.2.0"
+version = "0.3.0"
 description = "HALO — HTTP API Language for Operations. FastAPI plugin for self-describing APIs for LLM agents."
 readme = "README.md"
 license = "Apache-2.0"

@@ -532,6 +532,17 @@ response = agent.chat('Send a welcome email to the new customer')
 
 **Per-endpoint fields** (`OPTIONS /route` response):
 
+Each HALO schema describes a single method on a single path. The `call.method` and `call.url` fields together identify the operation. When a path supports multiple HTTP methods (e.g. `GET /resource` and `POST /resource`), the `OPTIONS /resource` response should return an array of schemas — one per method:
+
+```json
+[
+  { "call": { "method": "GET",  "url": "/resource" }, "description": "Retrieve a resource", ... },
+  { "call": { "method": "POST", "url": "/resource" }, "description": "Create a resource", ... }
+]
+```
+
+When only one method exists on the path (the common case), the response is still a one-element array for consistency.
+
 | Field | Purpose |
 |---|---|
 | `description` | Natural language description of what the endpoint does |
@@ -791,8 +802,11 @@ The plugin walks FastAPI's internal route table — the same data structure Fast
 ```python
 # What the plugin reads from FastAPI's route table
 for route in app.routes:
-    method    = list(route.methods)[0]       # POST, GET, etc.
+    method    = next(iter(route.methods or {'GET'})).upper()
     path      = route.path                    # /api/payments/charge
+    # Note: FastAPI registers separate routes for different methods
+    # on the same path. The current implementation keys by path only
+    # — multi-method paths are a known limitation (see section 6.1).
     endpoint  = route.endpoint               # the async def function
     docstring = endpoint.__doc__             # the docstring
     hints     = get_type_hints(endpoint)     # request/response types
