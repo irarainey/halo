@@ -12,24 +12,78 @@
 
 ## Table of Contents
 
-**Part I — The HALO Protocol Specification**
+### Part I — The HALO Protocol Specification
 
-- [1. The Problem](#1-the-problem) — 1.1 How It Works Today · 1.2 The Drift Problem · 1.3 The Architecture Problem · 1.4 The Proxy Problem
-- [2. The Solution](#2-the-solution) — 2.1 The OPTIONS Verb · 2.2 The Activation Header · 2.3 The Schema Response · 2.4 Why Not Use OpenAPI? · 2.5 Where HALO Applies · 2.6 Error Responses
-- [3. Capability Discovery and Filtering](#3-capability-discovery-and-filtering) — 3.1 Root Discovery · 3.2 Tag Filtering · 3.3 Tag Conventions · 3.4 Auth-Aware Discovery · 3.5 Lazy Loading · 3.6 Intent-Based Filtering · 3.7 Caching
-- [4. Authentication](#4-authentication) — 4.1 Schema Shape · 4.2 Auth-Gated Schemas · 4.3 Credential Map
-- [5. Framework Integration](#5-framework-integration) — 5.1 Microsoft Agent Framework · 5.2 Semantic Kernel · 5.3 LangChain · 5.4 LlamaIndex · 5.5 Comparison
-- [6. Full Schema Specification](#6-full-schema-specification) — 6.1 Core Fields · 6.2 LLM-Native Fields · 6.3 Operational Fields
-- [7. Skills vs the OPTIONS Protocol](#7-skills-vs-the-options-protocol) — 7.1 Comparison · 7.2 Skills as Abstraction · 7.3 Where Each Belongs · 7.4 Migration
-- [8. Why This Is a Solid Foundation](#8-why-this-is-a-solid-foundation) — 8.1 Direct Call Path · 8.2 Conditional Guarantees · 8.3 Testability · 8.4 Additional Properties
-- [9. Security Considerations](#9-security-considerations) — 9.1 Auth-Gating · 9.2 Disclosure · 9.3 Schema Poisoning · 9.4 Prompt Injection · 9.5 Rate Limiting
+- [1. The Problem](#1-the-problem)
+  - [1.1 How It Works Today](#11-how-it-works-today)
+  - [1.2 The Drift Problem](#12-the-drift-problem)
+  - [1.3 The Architecture Problem](#13-the-architecture-problem)
+  - [1.4 The Proxy Problem](#14-the-proxy-problem)
+- [2. The Solution](#2-the-solution)
+  - [2.1 The OPTIONS Verb](#21-the-options-verb)
+  - [2.2 The Activation Header](#22-the-activation-header)
+  - [2.3 The Schema Response](#23-the-schema-response)
+  - [2.4 Why Not Use OpenAPI?](#24-why-not-use-openapi)
+  - [2.5 Where HALO Applies](#25-where-halo-applies--and-where-it-does-not)
+  - [2.6 Error Responses](#26-error-responses)
+- [3. Capability Discovery and Filtering](#3-capability-discovery-and-filtering)
+  - [3.1 Root Discovery](#31-root-discovery)
+  - [3.2 Tag Filtering](#32-tag-filtering)
+  - [3.3 Tag Conventions](#33-recommended-tag-conventions)
+  - [3.4 Auth-Aware Discovery](#34-auth-aware-discovery)
+  - [3.5 Lazy Loading](#35-two-phase-lazy-loading)
+  - [3.6 Intent-Based Filtering](#36-intent-based-filtering)
+  - [3.7 Caching](#37-caching)
+- [4. Authentication](#4-authentication)
+  - [4.1 Schema Shape](#41-schema-describes-shape-not-secret)
+  - [4.2 Auth-Gated Schemas](#42-auth-gated-schemas)
+  - [4.3 Credential Map](#43-agent-credential-map)
+- [5. Framework Integration](#5-framework-integration)
+  - [5.1 Microsoft Agent Framework](#51-microsoft-agent-framework)
+  - [5.2 Semantic Kernel](#52-semantic-kernel)
+  - [5.3 LangChain](#53-langchain)
+  - [5.4 LlamaIndex](#54-llamaindex)
+  - [5.5 Comparison](#55-framework-comparison)
+- [6. Full Schema Specification](#6-full-schema-specification)
+  - [6.1 Core Fields](#61-core-fields)
+  - [6.2 LLM-Native Fields](#62-llm-native-fields)
+  - [6.3 Operational Fields](#63-operational-fields)
+- [7. Skills vs the OPTIONS Protocol](#7-skills-vs-the-options-protocol)
+  - [7.1 Comparison](#71-honest-comparison)
+  - [7.2 Skills as Abstraction](#72-skills-as-an-abstraction-layer)
+  - [7.3 Where Each Belongs](#73-where-each-belongs)
+  - [7.4 Migration](#74-migration-path)
+- [8. Why This Is a Solid Foundation](#8-why-this-is-a-solid-foundation)
+  - [8.1 Direct Call Path](#81-direct-call-path-and-zero-operational-overhead)
+  - [8.2 Conditional Guarantees](#82-conditional-guarantees)
+  - [8.3 Testability](#83-the-schema-is-testable)
+  - [8.4 Additional Properties](#84-additional-properties)
+- [9. Security Considerations](#9-security-considerations)
+  - [9.1 Auth-Gating](#91-auth-gate-discovery-in-production)
+  - [9.2 Disclosure](#92-information-disclosure)
+  - [9.3 Schema Poisoning](#93-schema-poisoning)
+  - [9.4 Prompt Injection](#94-prompt-injection-via-schema-fields)
+  - [9.5 Rate Limiting](#95-rate-limiting-discovery)
 - [10. What This Replaces](#10-what-this-replaces)
-- [11. Prior Art and Naming](#11-prior-art-and-naming) — 11.1 HAL vs HALO · 11.2 Related Standards
+- [11. Prior Art and Naming](#11-prior-art-and-naming)
+  - [11.1 HAL vs HALO](#111-the-name-hal-vs-halo)
+  - [11.2 Related Standards](#112-related-standards-and-prior-art)
 
-**Part II — The Python Reference Implementation**
+### Part II — The Python Reference Implementation
 
-- [12. Server-Side Implementation](#12-halo-fastapi-server-side-implementation) — 12.1 Overview · 12.2 HaloRegister · 12.3 How It Works · 12.4 Server Example · 12.5 Auto-Derived Fields · 12.6 Other Languages · 12.7 OpenAPI Bridge
-- [13. Client-Side Agent Adapter](#13-halo-fastapi-client-side-agent-adapter) — 13.1 HaloClient · 13.2 Internals · 13.3 Credentials · 13.4 Framework Integration
+- [12. Server-Side Implementation](#12-halo-fastapi-server-side-implementation)
+  - [12.1 Overview](#121-overview)
+  - [12.2 HaloRegister](#122-the-haloregister-plugin)
+  - [12.3 How It Works](#123-what-haloregisterapp-actually-does)
+  - [12.4 Server Example](#124-complete-server-example)
+  - [12.5 Auto-Derived Fields](#125-what-halo-fastapi-derives-automatically)
+  - [12.6 Other Languages](#126-implementing-halo-in-other-languages)
+  - [12.7 OpenAPI Bridge](#127-openapi-bridge)
+- [13. Client-Side Agent Adapter](#13-halo-fastapi-client-side-agent-adapter)
+  - [13.1 HaloClient](#131-haloclient-core)
+  - [13.2 Internals](#132-what-haloclient-does-internally)
+  - [13.3 Credentials](#133-credential-injection)
+  - [13.4 Framework Integration](#134-framework-integration)
 - [14. Summary](#14-summary)
 
 ---
