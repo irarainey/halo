@@ -549,36 +549,17 @@ Most teams will start with skills because the upfront cost is lower. The natural
 
 ## 8. Why This Is a Solid Foundation
 
-### 8.1 Direct Call Path — No Proxy, No Extra Hop
+### 8.1 Direct Call Path and Zero Operational Overhead
 
-When MCP is deployed as a remote service, it acts as a proxy — every tool invocation travels through the MCP server before reaching the API. (MCP's in-process stdio transport avoids this hop but retains the protocol coupling described in section 1.3.) HALO eliminates the proxy layer entirely — the agent calls the API directly, always.
+HALO's architectural advantages — no proxy layer, no sidecar service, direct agent-to-API call path — are detailed in sections 1.3 and 1.4. The key property is that schema accuracy and zero operational overhead are the same thing: because the HALO handler lives inside the API, it cannot be separately broken, separately outdated, or separately unavailable.
 
-| | MCP (remote) | HALO |
-|---|---|---|
-| Call path | Agent → MCP server → API | Agent → API |
-| Latency | MCP round-trip added to every call | Minimum possible — direct |
-| Failure points | LLM, MCP server, MCP-to-API network, API | LLM and API only |
-| Timeout behaviour | Timeouts compound across hops | Single timeout, single hop |
-| Failure attribution | Which layer failed — MCP or API? | Unambiguous — only one service |
-| Observability | Requires tracing across two services | Single service logs tell the whole story |
-
-In distributed systems, every additional hop is not just latency overhead — it is a new surface for failure, a new place to add instrumentation, and a new layer to reason about when something goes wrong.
-
-### 8.2 No Additional Service to Deploy or Maintain
-
-When deployed as a remote service (the recommended production architecture), MCP requires a sidecar server process — a separate deployment, a separate codebase, a separate thing that can go down, drift out of sync, or be forgotten when the underlying API changes. MCP's in-process stdio transport avoids this but retains the protocol coupling described in section 1.3.
-
-HALO has none of this. The OPTIONS handler runs inside the existing API process. It shares the same deployment pipeline, the same infrastructure, the same uptime guarantees, the same authentication middleware, and the same codebase. There is nothing new to operate. If the API is running, HALO is running. If the API is down, there is nothing for the agent to call anyway.
-
-> **Key strength:** Schema accuracy and zero operational overhead are the same property. Because the HALO handler lives inside the API, it cannot be separately broken, separately outdated, or separately unavailable. Tight coupling is not a tradeoff — it is the point.
-
-### 8.3 Conditional Guarantees
+### 8.2 Conditional Guarantees
 
 HALO's core guarantees — no structural drift, no additional service, direct call path — are conditional on the API implementing the protocol natively. When an API serves its own HALO schema from inside its own process, these properties hold by construction.
 
 For third-party APIs you do not control, it is technically possible to write a proxy that serves HALO schemas on behalf of the upstream API. This reintroduces drift risk (the schema is no longer derived from the same code) and operational overhead (an additional service to maintain). This is no different from the problems HALO solves for native implementations — it is simply the unavoidable cost of describing an API you do not own. Treat the proxy pattern as a last resort for legacy or third-party integrations where native adoption is not possible.
 
-### 8.4 The Schema Is Testable
+### 8.3 The Schema Is Testable
 
 Because the schema lives on an HTTP endpoint it can be validated in CI:
 
@@ -589,27 +570,27 @@ curl -X OPTIONS https://api.example.com/payments/charge \
 
 Catch drift before it reaches production. Static schema files (like OpenAPI specs) can also be validated in CI, but they test the *file* — not the live endpoint. HALO's testability advantage is that the schema under test is the same one agents will receive at runtime.
 
-### 8.5 Version Controls Itself
+### 8.4 Version Controls Itself
 
-When the API changes, the OPTIONS response changes with it — same deployment, same commit, same version. Structural fields (inputs, outputs, types, auth) are derived from the code that handles requests, so a tool definition describing v1 behaviour while the API is on v2 cannot happen for those fields. LLM-native fields (`why`, `tags`, `effects`, `next`) are hand-written metadata and can still drift, but they live alongside the model definition, making staleness visible during code review.
+When the API changes, the OPTIONS response changes with it — same deployment, same commit, same version. Structural fields are derived from code and cannot describe v1 behaviour while the API is on v2. The drift caveat for LLM-native fields is covered in section 7.2.
 
-### 8.6 Monitorable Out of the Box
+### 8.5 Monitorable Out of the Box
 
 OPTIONS requests appear in your existing access logs. You can see exactly which agents are discovering which tools, how often, from where. You can rate-limit discovery separately from invocation. Your existing observability stack handles it automatically.
 
-### 8.7 Closes the Trust Boundary
+### 8.6 Closes the Trust Boundary
 
 Because OPTIONS responses come from the same authenticated server as the API calls themselves, the trust boundary is consistent — if you trust the API enough to call it, you trust the schema enough to read it. The description and the endpoint share the same security perimeter.
 
-### 8.8 OPTIONS Is a Familiar HTTP Primitive
+### 8.7 OPTIONS Is a Familiar HTTP Primitive
 
 OPTIONS is a well-established HTTP method with clear semantics: capability negotiation and introspection. Developers, HTTP clients, and documentation tooling already understand it. Using OPTIONS for HALO means the protocol builds on an existing, widely understood mechanism rather than introducing a novel one — lowering the barrier to adoption for both humans implementing it and tools consuming it.
 
-### 8.9 Multi-Tenant Tool Scoping Is Natural
+### 8.8 Multi-Tenant Tool Scoping Is Natural
 
-In systems where different users have different permissions, the OPTIONS response varies per request based on the auth token — different permitted fields, different rate limits, different available actions. Other approaches can achieve this (an API that filters its OpenAPI spec by auth token, for example), but it requires bespoke implementation. With HALO, auth-scoped discovery is the default pattern — it falls out naturally from the fact that the server already knows what the caller is allowed to do.
+Auth-scoped discovery (section 3.4) means different callers see different tool manifests — a natural fit for multi-tenant systems where permissions vary by user.
 
-### 8.10 The API Owner Regains Control
+### 8.9 The API Owner Regains Control
 
 An API that serves `application/llm+json` from OPTIONS is making a declaration: *I am ready to be used by machines, on my own terms, without an intermediary.* This gives control back to the people who actually know the API — the people who built it.
 
@@ -641,7 +622,7 @@ This is a transport-level concern, not a HALO-specific one. Any source of tool d
 
 - **TLS** — ensures schema responses are not tampered with in transit
 - **Schema signing** — HALO's `trust.signed` and `trust.jwks` fields (section 6.3) allow cryptographic verification of schema integrity
-- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.7)
+- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.6)
 
 ### 9.4 Prompt Injection via Schema Fields
 
@@ -661,7 +642,7 @@ OPTIONS requests are cheap to serve but could be abused for endpoint enumeration
 
 ## 10. What This Replaces
 
-HALO replaces the tool discovery and invocation layer — not the full scope of protocols like MCP. MCP's resources, prompts, sampling, and session primitives are outside HALO's scope. For teams whose MCP usage is primarily tool-based (which accounts for the majority of MCP server implementations), HALO provides the same capability with less infrastructure.
+HALO replaces the tool discovery and invocation layer — not the full scope of MCP (see scope note in section 2).
 
 | Current World | With HALO |
 |---|---|
