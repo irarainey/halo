@@ -73,9 +73,7 @@ MCP's in-process stdio transport is a variant of Option B — it avoids the netw
 
 ### 1.4 The Proxy Problem
 
-When deployed as a remote service, MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
-
-> **Fair acknowledgement:** The latency and failure-point concerns below apply specifically to remote MCP deployments. MCP's stdio transport runs in-process and avoids the network hop entirely (see section 1.3).
+When deployed as a remote standalone service (not using in-process stdio transport), MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
 
 In isolation, one extra network call seems trivial. In practice it compounds into several distinct problems:
 
