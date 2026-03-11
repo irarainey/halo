@@ -31,7 +31,7 @@ Some frameworks auto-generate structural schemas from code (FastAPI's OpenAPI ge
 
 ### 1.1 How It Works Today
 
-Current agent frameworks — LangChain, Semantic Kernel, Microsoft Agent Framework, and MCP — generally follow a similar pattern:
+Current agent frameworks — Microsoft Agent Framework, Semantic Kernel, LangChain, and MCP — generally follow a similar pattern:
 
 - A developer writes or decorates a tool definition describing what the API does
 - That definition is registered in a tool registry, MCP server, or agent config (some frameworks derive structural schemas from type hints, reducing boilerplate)
@@ -110,7 +110,7 @@ Host: api.example.com
 Accept: application/llm+json
 ```
 
-Servers that do not implement HALO return a 406 or their standard OPTIONS response. No conflict. No breakage.
+Servers that do not implement HALO return a 406 or their standard OPTIONS response. No conflict. No breakage. See section 2.6 for the full error response specification.
 
 > **Media type note:** `application/llm+json` is not a registered IANA media type. It is a custom media type used by this specification as a convention. IANA registration would be a future step if the protocol sees broader adoption. In practice, custom media types with the `+json` suffix are widely used and well-handled by HTTP infrastructure.
 
@@ -162,7 +162,7 @@ The question is not whether OpenAPI describes APIs — it does, comprehensively 
 
 An OpenAPI spec is served as a single document. The OpenAPI 3.x specification defines no standard mechanism for requesting a subset by tag, method, or path — the full document is always served. OpenAPI has a `tags` concept, but tags are purely for documentation grouping used by tools like Swagger UI. They have no runtime filtering semantics.
 
-> **Fair counter-argument:** A client can filter by OpenAPI tags after fetching the spec. This is trivial to implement. The HALO advantage is specifically *server-side* filtering (`OPTIONS /?tags=payments`) combined with *lazy per-endpoint schema loading* — the agent never receives tool definitions it did not ask for, and full schemas are fetched only when the LLM selects a tool.
+> A client can filter by OpenAPI tags after fetching the spec. This is trivial to implement. The HALO advantage is specifically *server-side* filtering (`OPTIONS /?tags=payments`) combined with *lazy per-endpoint schema loading* — the agent never receives tool definitions it did not ask for, and full schemas are fetched only when the LLM selects a tool.
 
 **2. OpenAPI descriptions are written for humans, not LLMs.**
 
@@ -187,7 +187,7 @@ Beyond descriptions, OpenAPI lacks fields that help an LLM reason about tool sel
 | `trust` | Schema signing and verification | None |
 | `observe` | Trace header injection, audit logging | None |
 
-> **Fair counter-argument:** OpenAPI supports vendor extensions (`x-*`), so a team could define `x-llm-why`, `x-llm-effects`, etc. The mechanism to carry these fields exists. The difference is that HALO defines a *standard schema* for these fields — consistent naming, consistent structure, consistent tooling across implementations. Vendor extensions are ad-hoc by definition: every team invents its own convention, no framework knows how to consume them, and no contract exists between producer and consumer. HALO standardises what `x-*` leaves open.
+> OpenAPI supports vendor extensions (`x-*`), so a team could define `x-llm-why`, `x-llm-effects`, etc. The mechanism to carry these fields exists. The difference is that HALO defines a *standard schema* for these fields — consistent naming, consistent structure, consistent tooling across implementations. Vendor extensions are ad-hoc by definition: every team invents its own convention, no framework knows how to consume them, and no contract exists between producer and consumer. HALO standardises what `x-*` leaves open.
 
 **3. OpenAPI requires non-trivial transformation for LLM consumption.**
 
@@ -213,23 +213,23 @@ An OpenAPI spec is the same document regardless of who requests it. There is no 
 | Industry adoption | Ubiquitous | New | OpenAPI wins |
 | Complementary use | Can coexist with HALO | Can coexist with OpenAPI | Not mutually exclusive |
 
-> **The bottom line:** OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 12.7) for teams transitioning between them.
+OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 12.7) for teams transitioning between them.
 
 ### 2.5 Where HALO Applies — and Where It Does Not
 
 Consumer LLM clients — ChatGPT, GitHub Copilot, Claude Desktop, Cursor, Windsurf — are coupled to MCP (or proprietary equivalents) for tool integration. HALO cannot be used directly with these clients. They do not support arbitrary HTTP tool-calling protocols, and there is no mechanism to add one.
 
+HALO cannot bypass the MCP coupling in consumer clients. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
+
 **HALO's primary audience is developer-built agent systems** — applications where the developer controls the agent runtime and chooses how tools are discovered and invoked. This includes:
 
-- Custom agents built with Semantic Kernel, LangChain, Microsoft Agent Framework, or LlamaIndex
+- Custom agents built with Microsoft Agent Framework, Semantic Kernel, LangChain, or LlamaIndex
 - Backend agent orchestration and multi-agent systems
 - Server-side automation where agents call APIs programmatically
 
 For consumer client compatibility, the MCP bridge pattern (described in section 1.3) provides a path: a lightweight MCP server that reads its tool definitions from HALO schemas at runtime rather than maintaining them as hand-written artifacts. This gives last-mile clients like Copilot and Claude Desktop access to HALO-described APIs through MCP, while the API owner maintains a single source of truth via HALO. The MCP server becomes a thin protocol translator with no hand-written tool definitions to maintain.
 
-> **Honest limitation:** HALO cannot bypass the MCP coupling in consumer clients. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
-
-> **Known limitation — API discovery:** HALO assumes the agent already knows the base URL of each API it connects to. The protocol describes how to discover tools *within* a known API, not how to discover *which APIs exist*. This is the same limitation as MCP (which requires server URLs to be configured) and OpenAPI (which requires the spec URL). Multi-API discovery — a registry of HALO-compliant APIs — is outside the current scope.
+HALO assumes the agent already knows the base URL of each API it connects to. The protocol describes how to discover tools *within* a known API, not how to discover *which APIs exist*. This is the same limitation as MCP (which requires server URLs to be configured) and OpenAPI (which requires the spec URL). Multi-API discovery — a registry of HALO-compliant APIs — is outside the current scope.
 
 ### 2.6 Error Responses
 
@@ -439,39 +439,7 @@ Any HALO implementation — regardless of language — needs to map the protocol
 
 > **Implementation note:** The code examples in this section use Python for consistency with the reference implementation described in Part II, but the same adapter pattern applies in any language. `HaloAgentFrameworkAdapter` and `HaloSemanticKernelAdapter` are implemented in `halo-fastapi` for Microsoft Agent Framework and Semantic Kernel respectively. The remaining adapter classes (`HaloLangChainAdapter`, `HaloLlamaIndexAdapter`) illustrate the target integration pattern for other frameworks but are not yet implemented.
 
-### 5.1 Semantic Kernel
-
-```python
-from halo_fastapi import HaloClient, HaloSemanticKernelAdapter
-from semantic_kernel import Kernel
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-
-kernel = Kernel()
-kernel.add_service(AzureChatCompletion(service_id='chat', ...))
-
-# Discover HALO tools and build a Semantic Kernel plugin
-client = await HaloClient('https://api.example.com', bearer_token=token).discover(tags=['payments'])
-adapter = HaloSemanticKernelAdapter(client)
-plugin = await adapter.create_plugin()  # KernelPlugin
-kernel.add_plugin(plugin)
-
-result = await kernel.invoke_prompt('Charge customer cust_123 £25')
-```
-
-The adapter wraps each discovered HALO tool as a ``@kernel_function``-decorated async function inside a ``KernelPlugin``. The ``why`` field becomes the function description, enabling Semantic Kernel's automatic function calling via ``FunctionChoiceBehavior.Auto()``.
-
-### 5.2 LangChain
-
-```python
-adapter = HaloLangChainAdapter('https://api.example.com', credentials)
-tools = await adapter.create_tools(tags=['payments'])
-
-agent = create_openai_tools_agent(llm, tools, prompt)
-executor = AgentExecutor(agent=agent, tools=tools)
-result = await executor.ainvoke({'input': 'Charge customer £25'})
-```
-
-### 5.3 Microsoft Agent Framework
+### 5.1 Microsoft Agent Framework
 
 ```python
 from halo_fastapi import HaloClient, HaloAgentFrameworkAdapter
@@ -495,6 +463,38 @@ agent = agent_framework.Agent(
 )
 ```
 
+### 5.2 Semantic Kernel
+
+```python
+from halo_fastapi import HaloClient, HaloSemanticKernelAdapter
+from semantic_kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
+
+kernel = Kernel()
+kernel.add_service(AzureChatCompletion(service_id='chat', ...))
+
+# Discover HALO tools and build a Semantic Kernel plugin
+client = await HaloClient('https://api.example.com', bearer_token=token).discover(tags=['payments'])
+adapter = HaloSemanticKernelAdapter(client)
+plugin = await adapter.create_plugin()  # KernelPlugin
+kernel.add_plugin(plugin)
+
+result = await kernel.invoke_prompt('Charge customer cust_123 £25')
+```
+
+The adapter wraps each discovered HALO tool as a ``@kernel_function``-decorated async function inside a ``KernelPlugin``. The ``why`` field becomes the function description, enabling Semantic Kernel's automatic function calling via ``FunctionChoiceBehavior.Auto()``.
+
+### 5.3 LangChain
+
+```python
+adapter = HaloLangChainAdapter('https://api.example.com', credentials)
+tools = await adapter.create_tools(tags=['payments'])
+
+agent = create_openai_tools_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools)
+result = await executor.ainvoke({'input': 'Charge customer £25'})
+```
+
 ### 5.4 LlamaIndex
 
 ```python
@@ -515,9 +515,9 @@ response = agent.chat('Send a welcome email to the new customer')
 
 | Framework | Tool Primitive | Key Pattern | Notable Mapping |
 |---|---|---|---|
+| Microsoft Agent | `FunctionTool` | Agent Framework tools | `create_tools()` builds tools from schema |
 | Semantic Kernel | `KernelFunction` | Central kernel, plugins | `why` → description, `next` → planner hints |
 | LangChain | `BaseTool / StructuredTool` | Toolkit pattern | Pydantic `ArgsSchema` from input fields |
-| Microsoft Agent | `FunctionTool` | Agent Framework tools | `create_tools()` builds tools from schema |
 | LlamaIndex | `FunctionTool` | `ToolMetadata` object | Pydantic schema from input fields |
 
 ---
