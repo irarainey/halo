@@ -52,7 +52,6 @@
   - [7.1 Comparison](#71-honest-comparison)
   - [7.2 Skills as Abstraction](#72-skills-as-an-abstraction-layer)
   - [7.3 Where Each Belongs](#73-where-each-belongs)
-  - [7.4 Migration](#74-migration-path)
 - [8. Why This Is a Solid Foundation](#8-why-this-is-a-solid-foundation)
   - [8.1 Direct Call Path](#81-direct-call-path-and-zero-operational-overhead)
   - [8.2 Conditional Guarantees](#82-conditional-guarantees)
@@ -707,7 +706,7 @@ In this architecture, the drift concern changes shape. When a skill mediates bet
 
 HALO's LLM-native fields (`why`, `effects`, `next`) occupy the space between these two layers. In a skills-first architecture, these fields may be less relevant to the LLM — which sees skills, not raw tools — but remain valuable in the developer loop: they document the API's behaviour for the skill author, and they provide structured metadata that skill orchestration engines can consume programmatically.
 
-> **Where HALO fits in a skills-first world:** HALO describes what each API endpoint does, mechanically and precisely. Skills describe what the agent should do, contextually and expressively. When skills orchestrate HALO-described tools, the combination gives the skill author a precise, drift-free contract to build on — rather than prose documentation that may be stale.
+HALO describes what each API endpoint does, mechanically and precisely. Skills describe what the agent should do, contextually and expressively. When skills orchestrate HALO-described tools, the combination gives the skill author a precise, drift-free contract to build on — rather than prose documentation that may be stale.
 
 ### 7.3 Where Each Belongs
 
@@ -717,10 +716,6 @@ HALO's LLM-native fields (`why`, `effects`, `next`) occupy the space between the
 | OPTIONS Protocol | Mechanical capability — what a single API endpoint does, exactly how to call it, what auth it needs, what side effects it has. Things that must be precise and must stay in sync with the live system. |
 
 > **Key principle:** Skills and schemas are not competing alternatives — they operate at different layers. Skills describe *what the agent should do*. Schemas describe *what the API can do*. When both are in skills the system is fragile at the mechanical layer. When both are in schemas the system is rigid at the behavioural layer. The combination is where the system becomes robust.
-
-### 7.4 Migration Path
-
-Most teams will start with skills because the upfront cost is lower and the expressiveness is immediate. As APIs stabilise, the structural accuracy and testability of the OPTIONS protocol become more valuable — particularly for the mechanical contract that skills rely on. The migration is not skills *to* protocol but skills *on top of* protocol: the skill continues to describe business logic, while the protocol ensures the underlying API contract is always correct.
 
 ---
 
