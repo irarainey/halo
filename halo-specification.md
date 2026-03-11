@@ -225,6 +225,24 @@ For consumer client compatibility, the MCP bridge pattern (described in section 
 
 > **Honest limitation:** HALO cannot bypass the MCP coupling in consumer clients. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
 
+> **Known limitation — API discovery:** HALO assumes the agent already knows the base URL of each API it connects to. The protocol describes how to discover tools *within* a known API, not how to discover *which APIs exist*. This is the same limitation as MCP (which requires server URLs to be configured) and OpenAPI (which requires the spec URL). Multi-API discovery — a registry of HALO-compliant APIs — is outside the current scope.
+
+### 2.6 Error Responses
+
+HALO uses standard HTTP status codes. No custom error format is required.
+
+| Scenario | Response |
+|---|---|
+| OPTIONS with `Accept: application/llm+json` on a HALO-enabled endpoint | `200` with `application/llm+json` body |
+| OPTIONS without the HALO accept header | `204 No Content` (standard OPTIONS behaviour) |
+| OPTIONS with `Accept: application/llm+json` on a non-HALO server | `406 Not Acceptable` or the server's standard OPTIONS response |
+| OPTIONS on a path that does not exist | `404 Not Found` — standard HTTP, no HALO-specific handling |
+| OPTIONS with unrecognised or malformed tag query | Server should ignore unrecognised tags and return matching tools. If no tools match, return an empty `tools` array — not an error. |
+| OPTIONS without required auth credentials | `401 Unauthorized` — standard HTTP |
+| OPTIONS with insufficient permissions | `403 Forbidden` or an empty manifest (auth-aware discovery returns only permitted tools) |
+
+Implementations should not invent HALO-specific error codes or error body formats. Standard HTTP semantics apply throughout.
+
 ---
 
 ## 3. Capability Discovery and Filtering
