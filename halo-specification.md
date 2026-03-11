@@ -4,7 +4,7 @@
 
 *Self-Describing APIs for LLM Agents — Without MCP*
 
-**Version: 0.2.0-draft**
+**Version: 0.3.0-draft**
 
 ## Specification, Implementation & Framework Integration Guide
 
@@ -139,6 +139,63 @@ Servers that do not implement HALO return a 406 or their standard OPTIONS respon
   ]
 }
 ```
+
+### 2.4 Why Not Just Use OpenAPI?
+
+This is the most common question about HALO. OpenAPI is a mature, well-tooled standard. Many frameworks auto-generate it from code. Some agent frameworks (LangChain, for example) already ship converters that transform OpenAPI specs into tool definitions. For basic tool calling with a small, stable API, **OpenAPI can work** — and HALO does not claim otherwise.
+
+The question is not whether OpenAPI describes APIs — it does, comprehensively — but whether it describes them *for LLM agents specifically, at runtime, in a way that scales*. The gaps that emerge are real but nuanced, and where OpenAPI has a fair counter-argument, it is noted.
+
+#### The Specific Gaps
+
+**1. OpenAPI is monolithic — HALO is granular.**
+
+An OpenAPI spec is served as a single document. The OpenAPI 3.x specification defines no standard mechanism for requesting a subset by tag, method, or path — the full document is always served. OpenAPI has a `tags` concept, but tags are purely for documentation grouping used by tools like Swagger UI. They have no runtime filtering semantics.
+
+> **Fair counter-argument:** A client can filter by OpenAPI tags after fetching the spec. This is trivial to implement. The HALO advantage is specifically *server-side* filtering (`OPTIONS /?tags=payments`) combined with *lazy per-endpoint schema loading* — the agent never receives tool definitions it did not ask for, and full schemas are fetched only when the LLM selects a tool.
+
+**2. OpenAPI does not contain LLM-native reasoning fields.**
+
+Every major LLM provider uses the same core structure for tool definitions: a name, a description, and parameters as JSON Schema ([OpenAI](https://platform.openai.com/docs/guides/function-calling), [Anthropic](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview), [Google Gemini](https://ai.google.dev/gemini-api/docs/function-calling)). No provider natively accepts an OpenAPI specification — all require conversion.
+
+OpenAPI provides the base fields these formats require: `operationId` maps to name, `summary`/`description` map to description, and request body schemas provide parameters. **For basic tool calling, this works.** What OpenAPI does not provide are the fields that help an LLM *reason about* tool selection:
+
+| HALO field | Purpose | OpenAPI 3.x equivalent |
+|---|---|---|
+| `why` | Routing hint: when to choose this tool over alternatives | None |
+| `effects` | Side effects, reversibility, undo endpoint | None |
+| `next` | Conditional workflow chaining | `Link Object` (partial — no conditional `when` clauses) |
+| `limits` | Rate limits, idempotency | None |
+| `resilience` | Retry strategy, timeout, fallback endpoint | None |
+| `trust` | Schema signing and verification | None |
+| `observe` | Trace header injection, audit logging | None |
+
+> **Fair counter-argument:** OpenAPI supports vendor extensions (`x-*`), so a team could define `x-llm-why`, `x-llm-effects`, etc. The mechanism to carry these fields exists. The difference is that HALO defines a *standard schema* for these fields — consistent naming, consistent structure, consistent tooling across implementations. Vendor extensions are ad-hoc by definition: every team invents its own convention, no framework knows how to consume them, and no contract exists between producer and consumer. HALO standardises what `x-*` leaves open.
+
+**3. OpenAPI requires non-trivial transformation for LLM consumption.**
+
+Converting an OpenAPI spec to tool definitions requires resolving `$ref` pointers, merging path/query/body parameters into a single flat object, navigating 7–8 levels of nesting, and synthesising names from `operationId`. Frameworks like LangChain ship converters that handle this, so the burden is not necessarily per-project — but it is a transformation layer that must be maintained as both OpenAPI and the framework evolve.
+
+HALO schemas are flat, self-contained, and designed to be directly consumable — no dereferencing, no merging, no nesting traversal.
+
+**4. OpenAPI discovery is not auth-scoped.**
+
+An OpenAPI spec is the same document regardless of who requests it. There is no standard mechanism for serving a filtered spec based on the caller's permissions. HALO's root manifest varies per request based on the authentication token — a read-only caller discovers only read endpoints. (See section 3.4.)
+
+#### Honest Assessment
+
+| Dimension | OpenAPI | HALO | Notes |
+|---|---|---|---|
+| Structural schema accuracy | High (when auto-generated) | High (derived from same code) | Comparable |
+| LLM-native reasoning fields | None (extensible via `x-*`) | Standardised: `why`, `effects`, `next`, `limits`, etc. | HALO standardises what `x-*` leaves ad-hoc |
+| Granularity | Monolithic (client-side filtering possible) | Per-endpoint + server-side tag filtering | HALO avoids loading unused schemas entirely |
+| Transformation for LLM use | Non-trivial (libraries exist) | Direct consumption — flat, self-contained | Solved problem vs no-problem |
+| Auth-scoped discovery | Not supported | Built-in — manifest varies by caller | HALO wins |
+| Tooling ecosystem | Excellent — Swagger UI, code generators, validators | Early — reference implementation only | OpenAPI wins |
+| Industry adoption | Ubiquitous | New | OpenAPI wins |
+| Complementary use | Can coexist with HALO | Can coexist with OpenAPI | Not mutually exclusive |
+
+> **The bottom line:** OpenAPI is a comprehensive API description standard with a mature ecosystem. For basic tool calling with small, stable APIs, converting OpenAPI to tool definitions works. HALO is designed for the use case OpenAPI was not: runtime, per-endpoint, auth-scoped discovery with standardised LLM-native reasoning fields. The two are complementary — a FastAPI application can serve both simultaneously, and `halo-fastapi` includes an OpenAPI bridge (section 11.7) for teams transitioning between them.
 
 ---
 
@@ -587,7 +644,7 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 | Standard | Relationship to HALO |
 |---|---|
 | HAL (Hypertext Application Language) | Hypermedia links in response bodies for API navigation. No LLM-native fields. Complementary. |
-| OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native fields (`why`, `tags`, `effects`, `next`) and is not served per-endpoint at runtime. |
+| OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native reasoning fields, is served as a monolithic document with no standard subsetting mechanism, and requires non-trivial transformation for LLM consumption (`$ref` resolution, nesting traversal, parameter merging). See section 2.4 for a detailed comparison. |
 | agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent to HALO — covers tool schemas, authentication flows, and API-level rate limits. However, it is a static file that must be maintained separately from the code, inheriting drift risk for structural fields. HALO’s per-endpoint OPTIONS approach derives structural schemas from the code at runtime. |
 | HAL MCP Server | An MCP server wrapping HTTP APIs for LLMs. Adds the MCP layer rather than removing it. |
 | GraphQL Introspection | Runtime schema discovery — genuinely live and self-describing, but locked to GraphQL. HALO fills this gap for REST. |
