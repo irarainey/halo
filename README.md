@@ -147,13 +147,15 @@ halo/
 │           ├── _agent_framework_adapter.py  # Agent Framework integration
 │           └── _semantic_kernel_adapter.py  # Semantic Kernel integration
 ├── samples/                   # Sample applications
-│   ├── api/                   # HALO-compliant demo API
-│   │   ├── data/              # JSON data files (weather, books, inventory, employees)
-│   │   └── src/sample_api/
-│   ├── agent-framework/       # Microsoft Agent Framework sample
-│   │   └── src/sample_agent_framework/
-│   └── semantic-kernel/       # Semantic Kernel sample
-│       └── src/sample_semantic_kernel/
+│   ├── agents/
+│   │   ├── agent-framework/   # Microsoft Agent Framework sample
+│   │   │   └── src/sample_agent_framework/
+│   │   └── semantic-kernel/   # Semantic Kernel sample
+│   │       └── src/sample_semantic_kernel/
+│   └── servers/
+│       └── fastapi/           # HALO-compliant demo API
+│           ├── data/          # JSON data files (weather, books, inventory, employees)
+│           └── src/sample_api/
 ```
 
 ## Licence
