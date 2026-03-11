@@ -440,7 +440,7 @@ Agent starts
        ← { charge_id, status }
 ```
 
-Four interactions: manifest fetch, tool selection (LLM), schema fetch, request construction (LLM) + invocation. On subsequent calls to the same tool, the schema is cached and only the second LLM call is needed.
+Five interactions: manifest fetch, tool selection (LLM), schema fetch, request construction (LLM), and invocation. On subsequent calls to the same tool, the schema is cached and only the second LLM call is needed.
 
 ### 3.6 Intent-Based Filtering
 
@@ -748,7 +748,7 @@ Catch drift before it reaches production. Static schema files (like OpenAPI spec
 |---|---|
 | Version control | When the API changes, the OPTIONS response changes with it — same deployment, same commit, same version. Structural fields are derived from code and cannot describe v1 behaviour while the API is on v2. The drift caveat for LLM-native fields is covered in section 7.2. |
 | Observability | OPTIONS requests appear in existing access logs. Agents can be monitored, rate-limited, and traced using the existing observability stack. |
-| Trust boundary | OPTIONS responses come from the same authenticated server as the API calls themselves — consistent security perimeter (section 8.6 in earlier versions; now covered in section 9). |
+| Trust boundary | OPTIONS responses come from the same authenticated server as the API calls themselves — consistent security perimeter (section 9.1). |
 | Familiar primitive | OPTIONS is a well-established HTTP method with clear semantics. No novel mechanism to learn. |
 | Multi-tenant scoping | Auth-scoped discovery (section 3.4) means different callers see different tool manifests. |
 | API owner control | An API that serves `application/llm+json` from OPTIONS declares: *I am ready to be used by machines, on my own terms.* |
@@ -781,7 +781,7 @@ This is a transport-level concern, not a HALO-specific one. Any source of tool d
 
 - **TLS** — ensures schema responses are not tampered with in transit
 - **Schema signing** — HALO's `trust.signed` and `trust.jwks` fields (section 6.3) allow cryptographic verification of schema integrity
-- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 8.6 in the 0.2.0 spec; now section 9.1)
+- **Source trust** — if you trust the API enough to call it, you are already trusting its self-description. HALO's trust boundary is consistent: the schema and the endpoint share the same security perimeter (section 9.1)
 
 ### 9.4 Prompt Injection via Schema Fields
 
@@ -892,9 +892,8 @@ The plugin walks FastAPI's internal route table — the same data structure Fast
 for route in app.routes:
     method    = next(iter(route.methods or {'GET'})).upper()
     path      = route.path                    # /api/payments/charge
-    # Note: FastAPI registers separate routes for different methods
-    # on the same path. The current implementation keys by path only
-    # — multi-method paths are a known limitation (see section 6.1).
+    # FastAPI registers separate routes for different methods on the
+    # same path. Schemas are stored as a list per path to support this.
     endpoint  = route.endpoint               # the async def function
     docstring = endpoint.__doc__             # the docstring
     hints     = get_type_hints(endpoint)     # request/response types
@@ -948,13 +947,13 @@ def build_halo_schema(route, body_type, resp_type, auth) -> dict:
     llm_extra       = pydantic_schema.get('llm', {})
 
     schema = {
-        'description': llm_extra.get('why') or route.endpoint.__doc__ or '',
+        'description': route.endpoint.__doc__ or '',
         'call':        {'method': method, 'url': route.path},
         'auth':        auth,
         'input':       extract_input_fields(pydantic_schema),
         'output':      resp_type.model_json_schema() if resp_type else {},
         'tags':        llm_extra.get('tags', []),
-        'why':         llm_extra.get('why', ''),
+        'why':         llm_extra.get('why', route.endpoint.__doc__ or ''),
         'effects':     llm_extra.get('effects', {}),
         'next':        llm_extra.get('next', []),
         'examples':    llm_extra.get('examples', []),
@@ -967,7 +966,7 @@ def build_halo_schema(route, body_type, resp_type, auth) -> dict:
 Finally, the plugin registers OPTIONS handlers dynamically — one per route, and one for the root manifest:
 
 ```python
-def register_options_handlers(app, schemas: dict):
+def register_options_handlers(app, schemas: dict[str, list]):
     # Root manifest handler
     @app.options('/')
     async def root_manifest(request: Request):
@@ -976,27 +975,32 @@ def register_options_handlers(app, schemas: dict):
         # Auth-aware: filter tools by what this token can see
         token   = extract_token(request)
         visible = filter_by_scope(schemas, token)
+        tools = []
+        for path, schema_list in visible.items():
+            for s in schema_list:
+                tools.append({
+                    'url': path,
+                    'method': s['call']['method'],
+                    'name': path.strip('/').split('/')[-1],
+                    'description': s.get('description', ''),
+                    'tags': s.get('tags', []),
+                })
         return JSONResponse({
             'api':     app.title,
             'version': app.version,
             'description': getattr(app, 'description', ''),
-            'tools':   [{
-            'url': url,
-            'name': url.strip('/').split('/')[-1],
-            'description': s.get('description', ''),
-            'tags': s.get('tags', []),
-        } for url, s in visible.items()]
+            'tools':   tools,
         })
 
-    # Per-route handler for each registered endpoint
-    for path, schema in schemas.items():
-        def make_handler(s):
+    # Per-route handler — returns an array of schemas (one per method)
+    for path, schema_list in schemas.items():
+        def make_handler(response_list):
             @app.options(path)
             async def handler(request: Request):
                 if request.headers.get('accept') != 'application/llm+json':
                     return Response(status_code=204)
-                return JSONResponse(s)
-        make_handler(schema)
+                return JSONResponse(response_list)
+        make_handler(schema_list)
 ```
 
 > **The complete picture:** `HaloRegister(app)` is five steps: walk the route table, extract Pydantic schemas, detect auth from dependencies, assemble the HALO schema objects, and register OPTIONS handlers. The developer writes none of this — it happens automatically at app startup from metadata that already exists.
@@ -1178,8 +1182,8 @@ When `discover()` is called, `HaloClient` performs the following sequence:
 1. Fires `OPTIONS /` with `Accept: application/llm+json` — receives the root manifest with tool URLs, names, descriptions, and tags
 2. If tags were requested, the query `?tags=tag1,tag2` is appended and server-side filtering applies
 3. Stores the tool list from the manifest as `client.tools`
-4. On `get_tool(path)`, fires `OPTIONS /route` to fetch the full schema and caches it
-5. On `invoke(path, body)`, fetches the schema (cached), injects credentials from the credential map based on the target domain, and fires the real HTTP call using the method and URL from the schema
+4. On `get_tool(path)`, fires `OPTIONS /route` to fetch the full schema array and caches it. Accepts an optional `method` parameter to select a specific schema when multiple methods exist on the same path.
+5. On `invoke(path, body)`, fetches the schema (cached), injects credentials from the credential map based on the target domain, and fires the real HTTP call using the method and URL from the schema. For GET requests, `body` is sent as query parameters; for other methods, it is sent as a JSON body.
 6. Failed requests are retried with exponential backoff on connection errors, HTTP 429, and 5xx responses
 
 ### 13.3 Credential Injection
