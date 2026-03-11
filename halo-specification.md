@@ -88,9 +88,9 @@ HALO has no proxy layer. The LLM agent calls the API directly — OPTIONS to dis
 
 ## 2. The Solution
 
-> **Protocol note:** Everything in Part I describes the HALO protocol itself — a convention that can be implemented in any language on any platform. Python, Node.js, Go, Java, .NET, Ruby — any HTTP server can implement HALO by following this specification. The protocol has no dependency on any specific runtime, framework, or library.
+HALO is a protocol convention — language and platform agnostic — that can be implemented by any HTTP server. Python, Node.js, Go, Java, .NET, Ruby — the protocol has no dependency on any specific runtime, framework, or library.
 
-> **Scope note:** HALO solves one specific problem: how an LLM agent discovers and invokes HTTP API endpoints as tools. In this context, a "tool" is a REST API endpoint — a URL that accepts a request and returns a response. MCP is a broader protocol that also defines primitives for resources (read-only data sources), prompts (reusable interaction templates), sampling (server-initiated LLM completions), and a stateful session lifecycle. HALO does not attempt to replace these capabilities. In practice, tool discovery and invocation is the dominant use case in the MCP ecosystem — the majority of MCP servers expose tools as their primary or sole capability. HALO targets this use case directly, without the protocol and infrastructure overhead that MCP's broader feature set requires.
+HALO solves one specific problem: how an LLM agent discovers and invokes HTTP API endpoints as tools. In this context, a "tool" is a REST API endpoint — a URL that accepts a request and returns a response. MCP is a broader protocol that also defines primitives for resources, prompts, sampling, and sessions. HALO does not attempt to replace these capabilities — it targets tool discovery and invocation only, without the protocol and infrastructure overhead that MCP's broader feature set requires (see section 2.5 for applicability).
 
 HTTP has always had the mechanism to fix this. The OPTIONS method has existed since HTTP/1.1. Its semantic meaning is unambiguous: tell me what is possible at this endpoint. Its response body has never been standardised — which means it is effectively unclaimed territory.
 
