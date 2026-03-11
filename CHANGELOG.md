@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0-draft
+
+### Specification Changes
+
+- **OpenAPI comparison (section 2.4):** Rewritten with fair counter-arguments, cited LLM provider tool-calling formats (OpenAI, Anthropic, Gemini), acknowledged `x-*` extensions and existing conversion libraries. Removed unsupported "disabled in production" argument.
+- **MCP positioning:** Aligned throughout spec — HALO targets thin-wrapper MCP servers; complementary for MCP servers doing real work or serving consumer clients. Removed combative "Without MCP" subtitle. Added MCP bridge pattern (stdio MCP consuming HALO schemas at runtime).
+- **Scope note (section 2):** Added explicit scope — HALO targets HTTP API tool discovery only, not MCP's resources, prompts, sampling, or sessions. Clarified "tool" means REST API endpoint.
+- **Applicability (section 2.5):** New section — honest about consumer client limitations (ChatGPT, Copilot, Claude Desktop require MCP). HALO's audience is developer-built agent systems.
+- **Error responses (section 2.6):** New section — formalised HTTP status code behaviour for all OPTIONS scenarios.
+- **Skills comparison (section 7):** Rewritten — skills now win on most dimensions. Added skills-as-abstraction-layer framing, multi-source orchestration, deliberate decoupling vs accidental drift.
+- **Security (section 9):** New section — auth-gating recommendation, information disclosure, schema poisoning, prompt injection, rate limiting. All noted as not HALO-specific.
+- **Root manifest:** Added `description` field for API-level LLM reasoning. Documented manifest fields in section 6.1.
+- **Tag filtering (section 3.2):** Clarified OR semantics for multi-tag queries. Added DDD/microservices note.
+- **Two-phase lazy loading (section 3.5):** Corrected to show two LLM calls (tool selection + request construction).
+- **Caching (section 3.7):** New section — ETag/Cache-Control recommendation, cold-start vs warm-agent flows.
+- **Intent-based filtering (section 3.6):** Removed redundant second OPTIONS call — LLM selects from manifest directly.
+- **Prior art (section 11.2):** Added MCP as a proper entry. Updated OpenAPI entry to cross-reference section 2.4.
+- **Human vs LLM descriptions (section 2.4):** Added `why` vs OpenAPI `description` audience distinction with examples.
+- **IANA media type (section 2.2):** Added note that `application/llm+json` is a custom media type, not IANA-registered.
+- **API discovery limitation (section 2.5):** Acknowledged HALO requires pre-configured base URLs.
+- **Section 8:** Consolidated six short subsections into a compact table while retaining the three substantive subsections.
+- **Section 10 table:** Updated to acknowledge embedded MCP, MCP dynamic tool lists, and skills-as-decoupling.
+- **Section 14 summary:** Updated to reflect balanced MCP positioning, skills-first framing, and scoped "What it removes" list.
+- **Removed** undefined `"already": true` field from section 4.2.
+- **Removed** "commonly misunderstood" claim from section 12.4.
+
 ## 0.2.0
 
 ### Breaking Changes
