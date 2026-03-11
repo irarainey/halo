@@ -31,10 +31,11 @@ async def _request_with_retry(
     *,
     headers: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
     max_retries: int = _DEFAULT_MAX_RETRIES,
     base_delay: float = _DEFAULT_BASE_DELAY,
     max_delay: float = _DEFAULT_MAX_DELAY,
-) -> dict[str, Any]:
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Execute an HTTP request with exponential backoff on retryable failures.
 
     Retries on connection errors and 5xx / 429 responses.
@@ -42,7 +43,7 @@ async def _request_with_retry(
     last_exc: BaseException | None = None
     for attempt in range(max_retries + 1):
         try:
-            async with session.request(method, url, headers=headers, json=json) as resp:
+            async with session.request(method, url, headers=headers, json=json, params=params) as resp:
                 if resp.status == 429 or resp.status >= 500:
                     if attempt == max_retries:
                         resp.raise_for_status()
@@ -58,7 +59,7 @@ async def _request_with_retry(
                     await asyncio.sleep(delay)
                     continue
                 resp.raise_for_status()
-                result: dict[str, Any] = await resp.json(content_type=None)
+                result: dict[str, Any] | list[dict[str, Any]] = await resp.json(content_type=None)
                 return result
         except (aiohttp.ClientConnectionError, aiohttp.ServerDisconnectedError) as exc:
             last_exc = exc
@@ -122,7 +123,7 @@ class HaloClient:
         self._base_delay = base_delay
         self._max_delay = max_delay
         self._manifest: _types.HaloManifest | None = None
-        self._schemas: dict[str, _types.HaloSchema] = {}
+        self._schemas: dict[str, list[_types.HaloSchema]] = {}
         self._tools: list[_types.HaloToolEntry] = []
         self._session: aiohttp.ClientSession | None = None
 
@@ -150,7 +151,7 @@ class HaloClient:
         return self._manifest
 
     @property
-    def schemas(self) -> dict[str, _types.HaloSchema]:
+    def schemas(self) -> dict[str, list[_types.HaloSchema]]:
         """Cached per-route HALO schemas keyed by path."""
         return dict(self._schemas)
 
@@ -187,6 +188,9 @@ class HaloClient:
             max_delay=self._max_delay,
         )
 
+        if not isinstance(data, dict):
+            msg = f"Expected dict from root manifest, got {type(data).__name__}"
+            raise TypeError(msg)
         self._manifest = _types.HaloManifest(**data)
         self._tools = list(self._manifest.tools)
         _logger.info(
@@ -196,7 +200,7 @@ class HaloClient:
         )
         return self
 
-    async def get_tool(self, path: str) -> _types.HaloSchema:
+    async def get_tool(self, path: str, method: str | None = None) -> _types.HaloSchema:
         """Fetch the full HALO schema for a single endpoint.
 
         Caches the result so repeated calls do not fire
@@ -204,35 +208,46 @@ class HaloClient:
 
         Args:
             path: The endpoint path, e.g. ``/api/payments/charge``.
+            method: Optional HTTP method to select when multiple methods
+                exist on the same path. If not specified and only one
+                method exists, it is returned. If multiple exist, the
+                first is returned.
 
         Returns:
             The full ``HaloSchema`` for the endpoint.
         """
-        if path in self._schemas:
-            return self._schemas[path]
+        if path not in self._schemas:
+            url = self._base_url + path
+            headers = self._build_headers()
+            session = await self._get_session()
+            data = await _request_with_retry(
+                session,
+                "OPTIONS",
+                url,
+                headers=headers,
+                max_retries=self._max_retries,
+                base_delay=self._base_delay,
+                max_delay=self._max_delay,
+            )
 
-        url = self._base_url + path
-        headers = self._build_headers()
-        session = await self._get_session()
-        data = await _request_with_retry(
-            session,
-            "OPTIONS",
-            url,
-            headers=headers,
-            max_retries=self._max_retries,
-            base_delay=self._base_delay,
-            max_delay=self._max_delay,
-        )
+            # Server returns an array of schemas (one per method).
+            schemas = [_types.HaloSchema(**item) for item in data] if isinstance(data, list) else [_types.HaloSchema(**data)]
+            self._schemas[path] = schemas
+            _logger.debug("Fetched %d schema(s) for %s", len(schemas), path)
 
-        schema = _types.HaloSchema(**data)
-        self._schemas[path] = schema
-        _logger.debug("Fetched schema for %s", path)
-        return schema
+        schemas = self._schemas[path]
+        if method:
+            for s in schemas:
+                if s.call.method.upper() == method.upper():
+                    return s
+        return schemas[0]
 
     async def invoke(
         self,
         path: str,
         body: dict[str, Any] | None = None,
+        *,
+        method: str | None = None,
     ) -> dict[str, Any]:
         """Invoke an endpoint using its HALO schema.
 
@@ -241,28 +256,40 @@ class HaloClient:
 
         Args:
             path: The endpoint path.
-            body: Optional JSON request body.
+            body: Optional request parameters (JSON body for POST/PUT/PATCH, query params for GET).
+            method: Optional HTTP method to select when multiple methods exist on the path.
 
         Returns:
             The parsed JSON response.
         """
-        schema = await self.get_tool(path)
+        schema = await self.get_tool(path, method=method)
         url = self._base_url + schema.call.url
         method = schema.call.method.upper()
         headers = self._build_headers(include_accept_halo=False)
         _logger.debug("Invoking %s %s", method, url)
 
+        # GET requests use query parameters; other methods use JSON body.
+        request_kwargs: dict[str, Any] = {}
+        if method == "GET" and body:
+            request_kwargs["params"] = body
+        elif body:
+            request_kwargs["json"] = body
+
         session = await self._get_session()
-        return await _request_with_retry(
+        result = await _request_with_retry(
             session,
             method,
             url,
             headers=headers,
-            json=body,
+            **request_kwargs,
             max_retries=self._max_retries,
             base_delay=self._base_delay,
             max_delay=self._max_delay,
         )
+        if not isinstance(result, dict):
+            msg = f"Expected dict from invocation, got {type(result).__name__}"
+            raise TypeError(msg)
+        return result
 
     def _build_headers(self, include_accept_halo: bool = True) -> dict[str, str]:
         """Build request headers with credentials and Accept type."""

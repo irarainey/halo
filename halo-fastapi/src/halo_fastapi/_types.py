@@ -29,10 +29,6 @@ class HaloAuth(pydantic.BaseModel):
         serialization_alias="tokenUrl",
         description="OAuth token endpoint URL",
     )
-    already: bool = pydantic.Field(
-        default=False,
-        description="If true, discovery credentials are valid for invocation",
-    )
 
 
 class HaloCall(pydantic.BaseModel):
@@ -146,6 +142,7 @@ class HaloToolEntry(pydantic.BaseModel):
     """A single tool entry in the root discovery manifest."""
 
     url: str = pydantic.Field(..., description="Endpoint path")
+    method: str = pydantic.Field(default="", description="HTTP method (GET, POST, etc.)")
     name: str = pydantic.Field(default="", description="Short human-readable tool name")
     description: str = pydantic.Field(default="", description="What the tool does")
     tags: list[str] = pydantic.Field(default_factory=list, description="Tags for filtering")
@@ -160,4 +157,5 @@ class HaloManifest(pydantic.BaseModel):
 
     api: str = pydantic.Field(..., description="API title")
     version: str = pydantic.Field(..., description="API version")
+    description: str = pydantic.Field(default="", description="What this API does")
     tools: list[HaloToolEntry] = pydantic.Field(default_factory=list, description="Available tool endpoints")

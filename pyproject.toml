@@ -34,8 +34,8 @@ conflicts = [
 ]
 
 [tool.uv.workspace]
-members = ["halo-fastapi", "samples/*"]
-exclude = ["samples/agent-framework", "samples/semantic-kernel"]
+members = ["halo-fastapi", "samples/servers/*", "samples/agents/*"]
+exclude = ["samples/agents/agent-framework", "samples/agents/semantic-kernel"]
 
 [tool.uv.sources]
 halo-fastapi = { workspace = true }
@@ -79,32 +79,32 @@ cmd = "pytest halo-fastapi/tests/ -v"
 help = "Sync dependencies for Agent Framework development"
 sequence = [
     { cmd = "uv sync --all-packages --reinstall" },
-    { cmd = "uv pip install -e samples/agent-framework" },
+    { cmd = "uv pip install -e samples/agents/agent-framework" },
 ]
 
 [tool.poe.tasks."sync:sk"]
 help = "Sync dependencies for Semantic Kernel development"
 sequence = [
     { cmd = "uv sync --all-packages --reinstall" },
-    { cmd = "uv pip install -e samples/semantic-kernel" },
+    { cmd = "uv pip install -e samples/agents/semantic-kernel" },
 ]
 
 [tool.poe.tasks.api]
-help = "Start the sample API on port 3001"
-cmd = "uvicorn sample_api.main:app --reload --port 3001"
-cwd = "samples/api/src"
+help = "Start the sample API on port 3010"
+cmd = "uvicorn sample_api.main:app --reload --port 3010"
+cwd = "samples/servers/fastapi/src"
 envfile = ".env"
 
 [tool.poe.tasks.maf]
 help = "Start the Agent Framework DevUI (requires sample API)"
 cmd = "python -m sample_agent_framework.main"
-cwd = "samples/agent-framework/src"
+cwd = "samples/agents/agent-framework/src"
 envfile = ".env"
 
 [tool.poe.tasks.sk]
 help = "Start the Semantic Kernel CLI chat (requires sample API)"
 cmd = "python -m sample_semantic_kernel.main"
-cwd = "samples/semantic-kernel/src"
+cwd = "samples/agents/semantic-kernel/src"
 envfile = ".env"
 
 # ── Ruff ────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ envfile = ".env"
 [tool.ruff]
 target-version = "py313"
 line-length = 140
-src = ["halo-fastapi/src", "samples/api/src", "samples/agent-framework/src", "samples/semantic-kernel/src"]
+src = ["halo-fastapi/src", "samples/servers/fastapi/src", "samples/agents/agent-framework/src", "samples/agents/semantic-kernel/src"]
 
 [tool.ruff.lint]
 select = [
@@ -143,7 +143,7 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 python_version = "3.13"
-mypy_path = ["halo-fastapi/src", "samples/api/src", "samples/agent-framework/src", "samples/semantic-kernel/src"]
+mypy_path = ["halo-fastapi/src", "samples/servers/fastapi/src", "samples/agents/agent-framework/src", "samples/agents/semantic-kernel/src"]
 packages = ["halo_fastapi", "sample_api", "sample_agent_framework", "sample_semantic_kernel"]
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true

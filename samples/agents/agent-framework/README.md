@@ -42,13 +42,13 @@ Select **Sample API + Agent Framework** from the Run and Debug dropdown and pres
 ```bash
 # Install MAF dependencies (once)
 uv sync --all-packages
-uv pip install -e samples/agent-framework
+uv pip install -e samples/agents/agent-framework
 
 # Start the API in one terminal
-uvicorn sample_api.main:app --reload --port 3001 --app-dir samples/api/src
+uvicorn sample_api.main:app --reload --port 3010 --app-dir samples/api/src
 
 # Start the agent in another terminal
-cd samples/agent-framework/src
+cd samples/agents/agent-framework/src
 python -m sample_agent_framework.main
 ```
 
@@ -61,7 +61,7 @@ Settings are managed via Pydantic Settings. The `.env` file in the repository ro
 | Variable | Default | Description |
 |---|---|---|
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
-| `API_BASE_URL` | `http://localhost:3001` | URL of the HALO-compliant API to consume |
+| `API_BASE_URL` | `http://localhost:3010` | URL of the HALO-compliant API to consume |
 | `API_TOKEN` | `halo-sample-token` | Bearer token for API authentication |
 | `AZURE_OPENAI_ENDPOINT` | *(required)* | Azure OpenAI resource endpoint |
 | `AZURE_OPENAI_API_KEY` | *(required)* | Azure OpenAI API key |
@@ -76,7 +76,7 @@ Conversation threads are persisted as JSON files in the `.threads/` directory (r
 ## Project Structure
 
 ```text
-samples/agent-framework/
+samples/agents/agent-framework/
 └── src/sample_agent_framework/
     ├── main.py            # DevUI server with thread persistence
     ├── settings.py        # Pydantic Settings configuration

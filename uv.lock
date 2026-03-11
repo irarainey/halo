@@ -701,7 +701,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "halo-fastapi", editable = "halo-fastapi" },
-    { name = "halo-sample-api", editable = "samples/api" },
+    { name = "halo-sample-api", editable = "samples/servers/fastapi" },
 ]
 
 [package.metadata.requires-dev]
@@ -716,7 +716,7 @@ dev = [
 
 [[package]]
 name = "halo-fastapi"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "halo-fastapi" }
 dependencies = [
     { name = "aiohttp" },
@@ -745,7 +745,7 @@ provides-extras = ["agent-framework", "semantic-kernel"]
 [[package]]
 name = "halo-sample-api"
 version = "0.0.1"
-source = { editable = "samples/api" }
+source = { editable = "samples/servers/fastapi" }
 dependencies = [
     { name = "fastapi" },
     { name = "halo-fastapi" },

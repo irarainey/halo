@@ -38,10 +38,10 @@ The sample agent apps are excluded from the workspace due to conflicting transit
 
 ```bash
 # Agent Framework sample
-uv pip install -e samples/agent-framework
+uv pip install -e samples/agents/agent-framework
 
 # Semantic Kernel sample
-uv pip install -e samples/semantic-kernel
+uv pip install -e samples/agents/semantic-kernel
 ```
 
 ## Server Usage
@@ -55,6 +55,28 @@ HaloRegister(app)
 ```
 
 Everything is derived automatically from your existing route definitions, Pydantic models, docstrings, and dependency injection. LLM-native fields (`why`, `tags`, `effects`) can be added via `json_schema_extra` on your Pydantic models.
+
+### Multi-Method Paths
+
+When multiple HTTP methods share the same path (e.g. GET and POST on `/api/books`), each method gets its own HALO schema. `OPTIONS /api/books` returns an array — one schema per method.
+
+### GET Endpoints with Query Parameters
+
+For GET endpoints using query parameters, use a Pydantic model via `Depends()` to carry LLM metadata:
+
+```python
+from fastapi import Depends
+
+class BookSearchRequest(BaseModel):
+    query: str | None = Field(None, description="Search term")
+    model_config = ConfigDict(json_schema_extra={"llm": {"why": "Search books", "tags": ["books", "read"]}})
+
+@app.get("/api/books")
+async def search_books(params: BookSearchRequest = Depends()):
+    ...
+```
+
+The Pydantic model's `json_schema_extra` provides `why`, `tags`, and `examples` — the same pattern used for POST body models.
 
 ### Auth Detection
 

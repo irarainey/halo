@@ -113,7 +113,7 @@ The repository includes a dev container with all tooling pre-configured. Open in
 
 | Command | Description |
 |---|---|
-| `poe api` | Start the sample API on port 3001 |
+| `poe api` | Start the sample API on port 3010 |
 | `poe maf` | Start the Agent Framework DevUI (requires API) |
 | `poe sk` | Start the Semantic Kernel CLI chat (requires API) |
 | `poe sync:maf` | Sync dependencies for Agent Framework |

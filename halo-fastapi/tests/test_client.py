@@ -189,15 +189,15 @@ class TestHaloClientInit:
     """Tests for HaloClient initialisation."""
 
     def test_strips_trailing_slash(self) -> None:
-        client = _client.HaloClient(base_url="http://localhost:3001/")
-        assert client._base_url == "http://localhost:3001"
+        client = _client.HaloClient(base_url="http://localhost:3010/")
+        assert client._base_url == "http://localhost:3010"
 
     def test_bearer_token_stored_as_credential(self) -> None:
         client = _client.HaloClient(
-            base_url="http://localhost:3001",
+            base_url="http://localhost:3010",
             bearer_token="my-token",
         )
-        cred = client._credentials.get("localhost:3001")
+        cred = client._credentials.get("localhost:3010")
         assert cred is not None
         assert cred["type"] == "bearer"
         assert cred["value"] == "my-token"
@@ -254,7 +254,7 @@ class TestBuildHeaders:
 
     def test_bearer_token_header(self) -> None:
         client = _client.HaloClient(
-            base_url="http://localhost:3001",
+            base_url="http://localhost:3010",
             bearer_token="tok123",
         )
         headers = client._build_headers()
@@ -387,14 +387,55 @@ class TestHaloClientGetTool:
 
     async def test_schemas_property_returns_copy(self) -> None:
         client = _client.HaloClient(base_url="http://test")
-        client._schemas["/test"] = _types.HaloSchema(  # type: ignore[call-arg]
-            call=_types.HaloCall(method="GET", url="/test"),
-        )
+        client._schemas["/test"] = [
+            _types.HaloSchema(  # type: ignore[call-arg]
+                call=_types.HaloCall(method="GET", url="/test"),
+            )
+        ]
         schemas = client.schemas
         assert "/test" in schemas
         # Mutating the returned dict must not affect the internal state.
         schemas.pop("/test")
         assert "/test" in client._schemas
+        await client.close()
+
+    async def test_get_tool_with_method_selects_correct_schema(self) -> None:
+        """get_tool() with method parameter returns the matching schema."""
+        client = _client.HaloClient(base_url="http://test")
+        get_schema = _types.HaloSchema(  # type: ignore[call-arg]
+            call=_types.HaloCall(method="GET", url="/items"),
+            description="List items",
+        )
+        post_schema = _types.HaloSchema(  # type: ignore[call-arg]
+            call=_types.HaloCall(method="POST", url="/items"),
+            description="Create item",
+        )
+        client._schemas["/items"] = [get_schema, post_schema]
+
+        result = await client.get_tool("/items", method="POST")
+        assert result.call.method == "POST"
+        assert result.description == "Create item"
+
+        result2 = await client.get_tool("/items", method="GET")
+        assert result2.call.method == "GET"
+        assert result2.description == "List items"
+        await client.close()
+
+    async def test_get_tool_without_method_returns_first(self) -> None:
+        """get_tool() without method returns the first schema in the list."""
+        client = _client.HaloClient(base_url="http://test")
+        get_schema = _types.HaloSchema(  # type: ignore[call-arg]
+            call=_types.HaloCall(method="GET", url="/items"),
+            description="List items",
+        )
+        post_schema = _types.HaloSchema(  # type: ignore[call-arg]
+            call=_types.HaloCall(method="POST", url="/items"),
+            description="Create item",
+        )
+        client._schemas["/items"] = [get_schema, post_schema]
+
+        result = await client.get_tool("/items")
+        assert result is get_schema
         await client.close()
 
 

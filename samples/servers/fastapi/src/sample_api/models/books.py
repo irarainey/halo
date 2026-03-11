@@ -13,7 +13,10 @@ def _to_lower(value: Any) -> Any:
 class BookSearchRequest(pydantic.BaseModel):
     """Request body for the book search endpoint. Accepts a search query and optional genre filter."""
 
-    query: str = pydantic.Field(..., description="Search term to match against book titles or author names")
+    query: str | None = pydantic.Field(
+        None,
+        description="Search term to match against book titles or author names. Returns all books if omitted.",
+    )
     genre: Annotated[
         Literal["fiction", "non-fiction", "technology"] | None,
         pydantic.BeforeValidator(_to_lower),
@@ -67,3 +70,45 @@ class BookSearchResponse(pydantic.BaseModel):
 
     results: list[BookResult] = pydantic.Field(..., description="List of books matching the search criteria")
     total: int = pydantic.Field(..., description="Number of results returned")
+
+
+class CreateBookRequest(pydantic.BaseModel):
+    """Request body to add a new book to the catalogue."""
+
+    title: str = pydantic.Field(..., description="Book title")
+    author: str = pydantic.Field(..., description="Author name(s)")
+    genre: Annotated[
+        Literal["fiction", "non-fiction", "technology"],
+        pydantic.BeforeValidator(_to_lower),
+    ] = pydantic.Field("fiction", description="Book genre")
+    summary: str = pydantic.Field("", description="Brief description of the book")
+
+    model_config = pydantic.ConfigDict(
+        json_schema_extra={
+            "llm": {
+                "why": (
+                    "Use to add a new book to the catalogue. Requires title and author at minimum. "
+                    "The book appears immediately in GET /api/books results. "
+                    "Data is stored in memory and resets on server restart."
+                ),
+                "tags": ["books", "write"],
+                "effects": {"reversible": False},
+                "examples": [
+                    {
+                        "input": {"title": "Dune", "author": "Frank Herbert", "genre": "fiction"},
+                        "output": {"isbn": "978-0-xxxx-xxxx-0", "title": "Dune", "author": "Frank Herbert"},
+                    },
+                ],
+            }
+        }
+    )
+
+
+class CreateBookResponse(pydantic.BaseModel):
+    """Response after successfully adding a book."""
+
+    isbn: str = pydantic.Field(..., description="Assigned ISBN-13 identifier")
+    title: str = pydantic.Field(..., description="Book title")
+    author: str = pydantic.Field(..., description="Author name(s)")
+    genre: str = pydantic.Field(..., description="Book genre")
+    message: str = pydantic.Field(..., description="Confirmation message")

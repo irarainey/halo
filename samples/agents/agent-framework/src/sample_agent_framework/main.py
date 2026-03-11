@@ -32,7 +32,7 @@ def main() -> None:
         all_tools_agent = asyncio.run(halo_all_tools.build())
         entities.append(all_tools_agent)
     except Exception:
-        log.warn("All-tools agent build failed — is the sample API running on port 3001?")
+        log.warn("All-tools agent build failed — is the sample API running on port 3010?")
 
     tags = [t.strip() for t in config.halo_tags.split(",") if t.strip()]
     if tags:
@@ -40,7 +40,7 @@ def main() -> None:
             filter_agent = asyncio.run(halo_filter_tools.build(tags))
             entities.append(filter_agent)
         except Exception:
-            log.warn("Filter-tools agent build failed — is the sample API running on port 3001?")
+            log.warn("Filter-tools agent build failed — is the sample API running on port 3010?")
 
     if not entities:
         log.warn("No agents registered. The DevUI will start without tools.")

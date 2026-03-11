@@ -7,11 +7,11 @@
             "extraPaths": []
         },
         {
-            "root": "samples/api/src",
+            "root": "samples/servers/fastapi/src",
             "extraPaths": ["halo-fastapi/src"]
         },
         {
-            "root": "samples/agent-framework/src",
+            "root": "samples/agents/agent-framework/src",
             "extraPaths": ["halo-fastapi/src"]
         }
     ]
