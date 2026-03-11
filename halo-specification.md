@@ -63,7 +63,7 @@ Beyond drift, MCP creates a structural architecture problem with two options —
 
 **Option A: MCP as a standalone service.** This is the architecturally correct approach — separate codebase, separate deployment, separate lifecycle. It makes sense when the MCP server does real work: reshaping the API surface for LLM consumption, composing multiple backend calls into a single tool, or presenting a fundamentally different abstraction. In these cases, the separate service is justified.
 
-For thin-wrapper MCP servers that map 1:1 to existing API endpoints, however, the standalone service adds operational overhead with no value beyond protocol translation. HALO targets this space: APIs that are already HTTP endpoints and need to be discoverable by LLM agents without an intermediate service layer.
+For thin-wrapper MCP servers that only map 1:1 to existing API endpoints, however, the standalone service adds operational overhead with no value beyond protocol translation. HALO targets this space: APIs that are already HTTP endpoints and need to be discoverable by LLM agents without an intermediate service layer.
 
 **Option B: MCP embedded in the API.** This avoids the operational overhead but conflates two distinct responsibilities — serving domain logic and acting as an agent transport layer. These have different reasons to change and different lifecycles. If MCP evolves, is versioned, or is replaced, your domain service has to change with it. In a microservices architecture this contaminates service boundaries that were deliberately drawn.
 
