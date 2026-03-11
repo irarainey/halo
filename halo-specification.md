@@ -27,7 +27,7 @@ Reference Implementation (`halo-fastapi`): [Apache 2.0](https://www.apache.org/l
 
 Current approaches to connecting LLM agents to external APIs share a common limitation: the agent-facing description of an API is either maintained separately from the code, or — where it is auto-generated — lacks the LLM-native fields that agents need to reason about tool selection, side effects, and workflow chaining.
 
-Some frameworks auto-generate structural schemas from code (FastAPI's OpenAPI generation, for example, eliminates structural drift for the fields it covers). But even auto-generated OpenAPI is not designed for agent consumption — it lacks fields like `why`, `tags`, `effects`, and `next`, and is not served per-endpoint at runtime. The remaining approaches — MCP servers, tool registries, skill documents, and agent config files — are secondary artifacts that describe an API but have no binding relationship to it.
+Some frameworks auto-generate structural schemas from code (FastAPI's OpenAPI generation, for example, eliminates structural drift for the fields it covers). But even auto-generated OpenAPI is not designed for agent consumption — it lacks fields like `why`, `tags`, `effects`, and `next`, is not served per-endpoint at runtime, and its descriptions are written for human developers, not for LLM reasoning. The remaining approaches — MCP servers, tool registries, skill documents, and agent config files — are secondary artifacts that describe an API but have no binding relationship to it.
 
 ### 1.1 How It Works Today
 
@@ -154,11 +154,18 @@ An OpenAPI spec is served as a single document. The OpenAPI 3.x specification de
 
 > **Fair counter-argument:** A client can filter by OpenAPI tags after fetching the spec. This is trivial to implement. The HALO advantage is specifically *server-side* filtering (`OPTIONS /?tags=payments`) combined with *lazy per-endpoint schema loading* — the agent never receives tool definitions it did not ask for, and full schemas are fetched only when the LLM selects a tool.
 
-**2. OpenAPI does not contain LLM-native reasoning fields.**
+**2. OpenAPI descriptions are written for humans, not LLMs.**
 
 Every major LLM provider uses the same core structure for tool definitions: a name, a description, and parameters as JSON Schema ([OpenAI](https://platform.openai.com/docs/guides/function-calling), [Anthropic](https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview), [Google Gemini](https://ai.google.dev/gemini-api/docs/function-calling)). No provider natively accepts an OpenAPI specification — all require conversion.
 
-OpenAPI provides the base fields these formats require: `operationId` maps to name, `summary`/`description` map to description, and request body schemas provide parameters. **For basic tool calling, this works.** What OpenAPI does not provide are the fields that help an LLM *reason about* tool selection:
+OpenAPI provides the base fields these formats require: `operationId` maps to name, `summary`/`description` map to description, and request body schemas provide parameters. **For basic tool calling, this works.** But there is a subtler problem: OpenAPI descriptions are written for human developers reading documentation, not for LLMs selecting tools. Consider the difference:
+
+- **OpenAPI description** (for a developer): *"Processes payment transactions using the Stripe billing integration with support for multi-currency settlements."*
+- **HALO `why` field** (for an LLM): *"Use to charge a customer immediately after order confirmation. Prefer /authorise if the charge amount may change before capture."*
+
+These serve different audiences. The OpenAPI description explains what the endpoint does and how it is implemented. The `why` field tells the LLM *when to choose this tool over alternatives* — routing guidance, not documentation. Trying to write one description that serves both results in serving neither well. HALO separates these concerns: the `description` field (derived from the docstring) serves human readers, while `why` serves the LLM.
+
+Beyond descriptions, OpenAPI lacks fields that help an LLM reason about tool selection entirely:
 
 | HALO field | Purpose | OpenAPI 3.x equivalent |
 |---|---|---|
@@ -187,6 +194,7 @@ An OpenAPI spec is the same document regardless of who requests it. There is no 
 | Dimension | OpenAPI | HALO | Notes |
 |---|---|---|---|
 | Structural schema accuracy | High (when auto-generated) | High (derived from same code) | Comparable |
+| Description audience | Written for human developers | Separate `description` (human) and `why` (LLM) | HALO serves both audiences without compromise |
 | LLM-native reasoning fields | None (extensible via `x-*`) | Standardised: `why`, `effects`, `next`, `limits`, etc. | HALO standardises what `x-*` leaves ad-hoc |
 | Granularity | Monolithic (client-side filtering possible) | Per-endpoint + server-side tag filtering | HALO avoids loading unused schemas entirely |
 | Transformation for LLM use | Non-trivial (libraries exist) | Direct consumption — flat, self-contained | Solved problem vs no-problem |
