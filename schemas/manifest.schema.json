@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/irarainey/halo/blob/main/schemas/manifest.schema.json",
+  "title": "HALO Root Manifest",
+  "description": "Schema for the root OPTIONS / response with Accept: application/llm+json. Describes the API and its available tools.",
+  "type": "object",
+  "required": ["api", "version", "tools"],
+  "properties": {
+    "api": {
+      "type": "string",
+      "description": "Name of the API."
+    },
+    "version": {
+      "type": "string",
+      "description": "API version string."
+    },
+    "description": {
+      "type": "string",
+      "description": "What this API does — helps LLMs decide whether to explore its tools."
+    },
+    "tools": {
+      "type": "array",
+      "description": "Array of tool entries describing available endpoints.",
+      "items": {
+        "$ref": "#/$defs/ToolEntry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ToolEntry": {
+      "type": "object",
+      "description": "A single tool entry in the manifest.",
+      "required": ["url", "method", "name", "description"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Endpoint path."
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method (GET, POST, PUT, PATCH, DELETE).",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Short human-readable tool name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the tool does."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for filtering and agent scoping.",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

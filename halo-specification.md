@@ -4,7 +4,7 @@
 
 *Self-Describing APIs for LLM Agents*
 
-**Version: 0.3.1-draft**
+**Version: 0.3.2-draft**
 
 **Author: Ira Rainey**
 
@@ -101,6 +101,11 @@ Reference Implementation (`halo-fastapi`): [Apache 2.0](https://www.apache.org/l
 
 *Language and platform agnostic — applicable to any API, any language, any framework*
 
+> The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+> "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+> document are to be interpreted as described in
+> [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
+
 ---
 
 ## 1. The Problem
@@ -190,7 +195,7 @@ Accept: application/llm+json
 
 Servers that do not implement HALO return a 406 or their standard OPTIONS response. No conflict. No breakage. See section 2.6 for the full error response specification.
 
-> **Media type note:** `application/llm+json` is not a registered IANA media type. It is a custom media type used by this specification as a convention. IANA registration would be a future step if the protocol sees broader adoption. In practice, custom media types with the `+json` suffix are widely used and well-handled by HTTP infrastructure.
+> **Media type note:** `application/llm+json` is not yet a registered IANA media type. Registration under the Standards Tree (RFC 6838) is intended. Until registration is complete, it is used by this specification as a convention. In practice, custom media types with the `+json` structured syntax suffix (RFC 6839) are widely used and well-handled by HTTP infrastructure.
 
 ### 2.3 The Schema Response
 
@@ -226,7 +231,7 @@ A per-endpoint `OPTIONS` response is always a JSON array — one schema per HTTP
 ]
 ```
 
-The server must respond with `Content-Type: application/llm+json`.
+The server MUST respond with `Content-Type: application/llm+json`.
 
 ### 2.4 Why Not Use OpenAPI?
 
@@ -309,7 +314,7 @@ HALO assumes the agent already knows the base URL of each API it connects to. Th
 
 ### 2.6 Error Responses
 
-HALO uses standard HTTP status codes. No custom error format is required.
+HALO uses standard HTTP status codes. No custom error format is REQUIRED.
 
 | Scenario | Response |
 |---|---|
@@ -317,11 +322,11 @@ HALO uses standard HTTP status codes. No custom error format is required.
 | OPTIONS without the HALO accept header | `204 No Content` (standard OPTIONS behaviour) |
 | OPTIONS with `Accept: application/llm+json` on a non-HALO server | `406 Not Acceptable` or the server's standard OPTIONS response |
 | OPTIONS on a path that does not exist | `404 Not Found` — standard HTTP, no HALO-specific handling |
-| OPTIONS with unrecognised or malformed tag query | Server should ignore unrecognised tags and return matching tools. If no tools match, return an empty `tools` array — not an error. |
+| OPTIONS with unrecognised or malformed tag query | Server SHOULD ignore unrecognised tags and return matching tools. If no tools match, return an empty `tools` array — not an error. |
 | OPTIONS without required auth credentials | `401 Unauthorized` — standard HTTP |
 | OPTIONS with insufficient permissions | `403 Forbidden` or an empty manifest (auth-aware discovery returns only permitted tools) |
 
-Implementations should not invent HALO-specific error codes or error body formats. Standard HTTP semantics apply throughout.
+Implementations SHOULD NOT invent HALO-specific error codes or error body formats. Standard HTTP semantics apply throughout.
 
 ---
 
@@ -386,7 +391,7 @@ This solves three problems simultaneously:
 
 ### 3.3 Recommended Tag Conventions
 
-Tags are free-form strings. The following conventions are recommended as a baseline:
+Tags are free-form strings. The following conventions are RECOMMENDED as a baseline:
 
 | Tag | Meaning |
 |---|---|
@@ -471,16 +476,16 @@ Two calls per selected tool: one manifest fetch, then one schema fetch per tool 
 
 ### 3.7 Caching
 
-The HTTP call costs described above are cold-start costs. In practice, APIs do not change frequently, and both manifests and per-endpoint schemas should be cached at the agent level.
+The HTTP call costs described above are cold-start costs. In practice, APIs do not change frequently, and both manifests and per-endpoint schemas SHOULD be cached at the agent level.
 
-The `HaloClient` reference implementation caches schemas in memory — `get_tool()` fires OPTIONS once per path per session. Implementations should also support HTTP-level caching using standard mechanisms:
+The `HaloClient` reference implementation caches schemas in memory — `get_tool()` fires OPTIONS once per path per session. Implementations SHOULD also support HTTP-level caching using standard mechanisms:
 
 - **`Cache-Control`** — the server can set `max-age` on OPTIONS responses to indicate how long schemas remain valid
 - **`ETag` / `If-None-Match`** — the client caches schemas with their ETag and revalidates with `If-None-Match` on subsequent requests. If unchanged, the server returns `304 Not Modified` with no body
 
 With caching in place, the common-case flow for a warm agent is: zero HTTP calls for cached schemas, one LLM call to construct the request, one HTTP call to invoke the endpoint. The multi-call lazy loading sequence only applies on first use or after cache invalidation.
 
-> **Protocol recommendation:** Server implementations should set `Cache-Control` and `ETag` headers on `application/llm+json` responses. This is standard HTTP behaviour and requires no HALO-specific mechanism.
+> **Protocol recommendation:** Server implementations SHOULD set `Cache-Control` and `ETag` headers on `application/llm+json` responses. This is standard HTTP behaviour and requires no HALO-specific mechanism.
 
 ---
 
@@ -606,30 +611,37 @@ response = agent.chat('Send a welcome email to the new customer')
 
 ## 6. Full Schema Specification
 
+Formal JSON Schema definitions for both response types are provided in the [`schemas/`](schemas/) directory:
+
+- [`manifest.schema.json`](schemas/manifest.schema.json) — root `OPTIONS /` response
+- [`endpoint.schema.json`](schemas/endpoint.schema.json) — per-endpoint `OPTIONS /route` response
+
+These schemas are the normative definition of a conforming `application/llm+json` document. The tables below summarise the fields and their requirements.
+
 ### 6.1 Core Fields
 
 **Manifest fields** (root `OPTIONS /` response):
 
-| Field | Purpose |
-|---|---|
-| `api` | Name of the API |
-| `version` | API version string |
-| `description` | What this API does — helps LLMs decide whether to explore its tools |
-| `tools` | Array of tool entries (see below) |
+| Field | Required | Purpose |
+|---|---|---|
+| `api` | REQUIRED | Name of the API |
+| `version` | REQUIRED | API version string |
+| `description` | OPTIONAL | What this API does — helps LLMs decide whether to explore its tools |
+| `tools` | REQUIRED | Array of tool entries (see below) |
 
 **Tool entry fields** (each element in the `tools` array):
 
 | Field | Required | Purpose |
 |---|---|---|
-| `url` | Yes | Endpoint path |
-| `method` | Yes | HTTP method (GET, POST, etc.) |
-| `name` | Yes | Short human-readable tool name |
-| `description` | Yes | What the tool does |
-| `tags` | No | Tags for filtering (defaults to empty array) |
+| `url` | REQUIRED | Endpoint path |
+| `method` | REQUIRED | HTTP method (GET, POST, PUT, PATCH, DELETE) |
+| `name` | REQUIRED | Short human-readable tool name |
+| `description` | REQUIRED | What the tool does |
+| `tags` | OPTIONAL | Tags for filtering (defaults to empty array) |
 
 **Per-endpoint fields** (`OPTIONS /route` response):
 
-Each HALO schema describes a single method on a single path. The `call.method` and `call.url` fields together identify the operation. When a path supports multiple HTTP methods (e.g. `GET /resource` and `POST /resource`), the `OPTIONS /resource` response should return an array of schemas — one per method:
+Each HALO schema describes a single method on a single path. The `call.method` and `call.url` fields together identify the operation. When a path supports multiple HTTP methods (e.g. `GET /resource` and `POST /resource`), the `OPTIONS /resource` response MUST return an array of schemas — one per method:
 
 ```json
 [
@@ -638,47 +650,47 @@ Each HALO schema describes a single method on a single path. The `call.method` a
 ]
 ```
 
-When only one method exists on the path (the common case), the response is still a one-element array for consistency.
+When only one method exists on the path (the common case), the response MUST still be a one-element array for consistency.
 
-| Field | Purpose |
-|---|---|
-| `description` | Natural language description of what the endpoint does |
-| `call.method` | HTTP verb: GET, POST, PUT, PATCH, DELETE |
-| `call.url` | Endpoint URL — relative or absolute |
-| `auth` | Auth shape: type, header name, required scopes |
-| `input` | JSON Schema describing request parameters |
-| `output` | JSON Schema describing the response structure |
-| `tags` | Array of strings for filtering and agent scoping |
+| Field | Required | Purpose |
+|---|---|---|
+| `description` | REQUIRED | Natural language description of what the endpoint does |
+| `call.method` | REQUIRED | HTTP verb: GET, POST, PUT, PATCH, DELETE |
+| `call.url` | REQUIRED | Endpoint URL — relative or absolute |
+| `auth` | OPTIONAL | Auth shape: type, header name, required scopes |
+| `input` | REQUIRED | JSON Schema describing request parameters |
+| `output` | OPTIONAL | JSON Schema describing the response structure |
+| `tags` | OPTIONAL | Array of strings for filtering and agent scoping |
 
 ### 6.2 LLM-Native Fields
 
 These fields exist to improve LLM reasoning and routing. Most have no direct equivalent in OpenAPI or MCP tool schemas (see section 2.4 for a detailed comparison).
 
-| Field | Purpose |
-|---|---|
-| `why` | Routing hint for LLM selection — when to use this vs alternatives |
-| `effects.reversible` | Boolean. Action can be undone. |
-| `effects.undo` | URL of the endpoint that reverses this action. |
-| `limits.rate` | Rate limit — e.g. `100/hour`. Enables agent to debounce or batch. |
-| `limits.idempotent` | Boolean. Calling twice has the same effect as calling once. |
-| `next` | Conditional next-step suggestions: `[{ when, suggest }]`. Enables workflow chaining. |
-| `examples` | Concrete input/output examples. Most reliable way to ensure correct call construction. |
+| Field | Required | Purpose |
+|---|---|---|
+| `why` | OPTIONAL | Routing hint for LLM selection — when to use this vs alternatives |
+| `effects.reversible` | OPTIONAL | Boolean. Action can be undone. |
+| `effects.undo` | OPTIONAL | URL of the endpoint that reverses this action. |
+| `limits.rate` | OPTIONAL | Rate limit — e.g. `100/hour`. Enables agent to debounce or batch. |
+| `limits.idempotent` | OPTIONAL | Boolean. Calling twice has the same effect as calling once. |
+| `next` | OPTIONAL | Conditional next-step suggestions: `[{ when, suggest }]`. Enables workflow chaining. |
+| `examples` | OPTIONAL | Concrete input/output examples. Most reliable way to ensure correct call construction. |
 
 ### 6.3 Operational Fields
 
-| Field | Purpose |
-|---|---|
-| `resilience.retry` | Boolean. Agent should retry on failure. |
-| `resilience.backoff` | Backoff strategy: `linear`, `exponential`, `none`. |
-| `resilience.timeout_ms` | Expected maximum response time in milliseconds. |
-| `resilience.fallback` | URL of a fallback endpoint if this one fails. |
-| `trust.signed` | Boolean. Schema is cryptographically signed. |
-| `trust.jwks` | URL of JWKS endpoint for signature verification. |
-| `status` | Lifecycle: `active`, `deprecated`, `sunset`. |
-| `sunset` | ISO date when deprecated endpoint will be removed. |
-| `replace_with` | URL of the replacement endpoint. |
-| `observe.trace_header` | Header name for trace ID injection. |
-| `observe.explain` | Boolean. Agent should include a call reason header for audit. |
+| Field | Required | Purpose |
+|---|---|---|
+| `resilience.retry` | OPTIONAL | Boolean. Agent SHOULD retry on failure. |
+| `resilience.backoff` | OPTIONAL | Backoff strategy: `linear`, `exponential`, `none`. |
+| `resilience.timeout_ms` | OPTIONAL | Expected maximum response time in milliseconds. |
+| `resilience.fallback` | OPTIONAL | URL of a fallback endpoint if this one fails. |
+| `trust.signed` | OPTIONAL | Boolean. Schema is cryptographically signed. |
+| `trust.jwks` | OPTIONAL | URL of JWKS endpoint for signature verification. |
+| `status` | OPTIONAL | Lifecycle: `active`, `deprecated`, `sunset`. |
+| `sunset` | OPTIONAL | ISO date when deprecated endpoint will be removed. |
+| `replace_with` | OPTIONAL | URL of the replacement endpoint. |
+| `observe.trace_header` | OPTIONAL | Header name for trace ID injection. |
+| `observe.explain` | OPTIONAL | Boolean. Agent SHOULD include a call reason header for audit. |
 
 ---
 
@@ -764,9 +776,9 @@ HALO's OPTIONS handlers expose API metadata — endpoint paths, parameter names 
 
 ### 9.1 Auth-Gate Discovery in Production
 
-If the API itself requires authentication, the OPTIONS handlers should too. An unauthenticated OPTIONS endpoint on an authenticated API creates an information asymmetry — callers who cannot invoke endpoints can still discover them.
+If the API itself requires authentication, the OPTIONS handlers SHOULD too. An unauthenticated OPTIONS endpoint on an authenticated API creates an information asymmetry — callers who cannot invoke endpoints can still discover them.
 
-The mitigation is straightforward: require the same credentials for discovery that the API requires for invocation. HALO's auth-aware discovery (section 3.4) already supports this — when credentials are passed with the OPTIONS request, the manifest reflects only what those credentials permit. In production, this should be the default, not an optional enhancement.
+The mitigation is straightforward: require the same credentials for discovery that the API requires for invocation. HALO's auth-aware discovery (section 3.4) already supports this — when credentials are passed with the OPTIONS request, the manifest reflects only what those credentials permit. In production, this SHOULD be the default, not an OPTIONAL enhancement.
 
 > **Recommendation:** If your API requires authentication, require it on OPTIONS as well. The `tool_filter` callback in `HaloRegister` (or equivalent in other implementations) can enforce this at the handler level. This is the same principle as any production system — do not expose metadata to callers who cannot act on it.
 
