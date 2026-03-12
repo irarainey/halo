@@ -6,9 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Specification Changes
 
-- **Skills description (section 7):** Removed "multi-tool orchestration" and "cross-tool coordination" from the skills column — the LLM should infer tool composition from well-described individual tools, which is what HALO enables.
-- **Intent-based filtering comment (section 3.6):** Fixed code comment to say "names and descriptions only" now that tags are no longer in the example.
 - **Tool surface trust (section 9.6):** New section — consumer-side risks from tool surface expansion and tool shadowing across servers, with manifest pinning and allowlist mitigations.
+- **Skills (sections 7, 7.3, 14):** Removed "multi-tool orchestration" and "tool orchestration logic" — the LLM should infer tool composition from well-described individual tools.
+- **Auth-aware discovery (section 3.4):** Replaced invalid JSON comments with separate code blocks.
+- **Server example (section 12.4):** Simplified annotated code example — replaced verbose block comments with concise inline annotations.
+- **Editorial pass:** Toned down absolute claims, removed repetitive disclaimers from section 9 subsections, fixed code examples in section 12.6 to return arrays per the spec, reduced verbosity across sections 1.2, 1.4, 2.4, 3.2, 8.2, and 12.3 without removing content, and minor language improvements throughout.
 - **Version:** Bumped to 0.3.1-draft.
 
 ### Documentation Changes
