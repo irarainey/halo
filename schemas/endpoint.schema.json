@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/irarainey/halo/blob/main/schemas/endpoint.schema.json",
+  "title": "HALO Per-Endpoint Response",
+  "description": "Schema for a per-endpoint OPTIONS /route response with Accept: application/llm+json. The response is always a JSON array of endpoint schemas — one per HTTP method on the path.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/EndpointSchema"
+  },
+  "minItems": 1,
+  "$defs": {
+    "EndpointSchema": {
+      "type": "object",
+      "description": "Schema describing a single HTTP method on a single endpoint path.",
+      "required": ["description", "call", "input"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Natural language description of what the endpoint does."
+        },
+        "call": {
+          "$ref": "#/$defs/Call"
+        },
+        "auth": {
+          "$ref": "#/$defs/Auth"
+        },
+        "input": {
+          "type": "object",
+          "description": "JSON Schema describing request parameters. Each key is a parameter name.",
+          "additionalProperties": {
+            "$ref": "#/$defs/InputField"
+          }
+        },
+        "output": {
+          "type": "object",
+          "description": "JSON Schema describing the response structure."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Array of strings for filtering and agent scoping.",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "why": {
+          "type": "string",
+          "description": "Routing hint for LLM selection — when to use this tool vs alternatives."
+        },
+        "effects": {
+          "$ref": "#/$defs/Effects"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "next": {
+          "type": "array",
+          "description": "Conditional next-step suggestions for workflow chaining.",
+          "items": {
+            "$ref": "#/$defs/NextStep"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "description": "Concrete input/output examples for call construction.",
+          "items": {
+            "$ref": "#/$defs/Example"
+          }
+        },
+        "resilience": {
+          "$ref": "#/$defs/Resilience"
+        },
+        "trust": {
+          "$ref": "#/$defs/Trust"
+        },
+        "status": {
+          "type": "string",
+          "description": "Lifecycle status of the endpoint.",
+          "enum": ["active", "deprecated", "sunset"]
+        },
+        "sunset": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO date when a deprecated endpoint will be removed."
+        },
+        "replace_with": {
+          "type": "string",
+          "description": "URL of the replacement endpoint."
+        },
+        "observe": {
+          "$ref": "#/$defs/Observe"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Call": {
+      "type": "object",
+      "description": "Identifies the HTTP method and URL for this endpoint.",
+      "required": ["method", "url"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "HTTP verb.",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        },
+        "url": {
+          "type": "string",
+          "description": "Endpoint URL — relative or absolute."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Auth": {
+      "type": "object",
+      "description": "Authentication shape required to invoke the endpoint.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Authentication type.",
+          "enum": ["bearer", "apikey", "oauth", "basic", "none"]
+        },
+        "header": {
+          "type": "string",
+          "description": "Header name for API key injection."
+        },
+        "scopes": {
+          "type": "array",
+          "description": "Required OAuth2 scopes.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenUrl": {
+          "type": "string",
+          "description": "OAuth2 token endpoint URL."
+        }
+      },
+      "additionalProperties": false
+    },
+    "InputField": {
+      "type": "object",
+      "description": "A single input parameter definition.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "JSON Schema type of the parameter."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the parameter is required."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the parameter."
+        },
+        "enum": {
+          "type": "array",
+          "description": "Allowed values for the parameter.",
+          "items": {}
+        }
+      },
+      "additionalProperties": true
+    },
+    "Effects": {
+      "type": "object",
+      "description": "Side effect declarations for the endpoint.",
+      "properties": {
+        "reversible": {
+          "type": "boolean",
+          "description": "Whether the action can be undone."
+        },
+        "undo": {
+          "type": "string",
+          "description": "URL of the endpoint that reverses this action."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Limits": {
+      "type": "object",
+      "description": "Rate limiting and idempotency declarations.",
+      "properties": {
+        "rate": {
+          "type": "string",
+          "description": "Rate limit expression, e.g. '100/hour'."
+        },
+        "idempotent": {
+          "type": "boolean",
+          "description": "Whether calling twice has the same effect as calling once."
+        }
+      },
+      "additionalProperties": false
+    },
+    "NextStep": {
+      "type": "object",
+      "description": "A conditional next-step suggestion.",
+      "required": ["when", "suggest"],
+      "properties": {
+        "when": {
+          "type": "string",
+          "description": "Condition expression, e.g. 'status=pending'."
+        },
+        "suggest": {
+          "type": "string",
+          "description": "URL of the suggested next endpoint."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Example": {
+      "type": "object",
+      "description": "A concrete input/output example.",
+      "properties": {
+        "input": {
+          "type": "object",
+          "description": "Example request parameters."
+        },
+        "output": {
+          "type": "object",
+          "description": "Example response body."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Resilience": {
+      "type": "object",
+      "description": "Retry and failure handling declarations.",
+      "properties": {
+        "retry": {
+          "type": "boolean",
+          "description": "Whether the agent SHOULD retry on failure."
+        },
+        "backoff": {
+          "type": "string",
+          "description": "Backoff strategy.",
+          "enum": ["linear", "exponential", "none"]
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "description": "Expected maximum response time in milliseconds.",
+          "minimum": 0
+        },
+        "fallback": {
+          "type": "string",
+          "description": "URL of a fallback endpoint if this one fails."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Trust": {
+      "type": "object",
+      "description": "Schema signing and verification declarations.",
+      "properties": {
+        "signed": {
+          "type": "boolean",
+          "description": "Whether the schema is cryptographically signed."
+        },
+        "jwks": {
+          "type": "string",
+          "description": "URL of JWKS endpoint for signature verification."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Observe": {
+      "type": "object",
+      "description": "Observability declarations.",
+      "properties": {
+        "trace_header": {
+          "type": "string",
+          "description": "Header name for trace ID injection."
+        },
+        "explain": {
+          "type": "boolean",
+          "description": "Whether the agent SHOULD include a call reason header for audit."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

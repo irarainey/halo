@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.2-draft
+
+### Specification Changes
+
+- **RFC 2119 conformance language:** Added RFC 2119 boilerplate to Part I and uppercased all normative keywords (`MUST`, `SHOULD`, `SHOULD NOT`, `REQUIRED`, `RECOMMENDED`, `OPTIONAL`) throughout the protocol specification.
+- **IANA media type registration (section 2.2):** Updated media type note to reflect intent to register `application/llm+json` under the IANA Standards Tree (RFC 6838). Added RFC 6839 reference for the `+json` structured syntax suffix.
+- **Formal JSON Schema definitions (section 6):** Added normative JSON Schema files for both response types — [`manifest.schema.json`](schemas/manifest.schema.json) (root `OPTIONS /`) and [`endpoint.schema.json`](schemas/endpoint.schema.json) (per-endpoint `OPTIONS /route`). Section 6 now references these as the normative definition of a conforming `application/llm+json` document.
+- **Required/Optional field tables (section 6):** All field tables in sections 6.1, 6.2, and 6.3 now include a `Required` column using RFC 2119 keywords (`REQUIRED` / `OPTIONAL`), replacing informal "Yes"/"No" values.
+- **Version:** Bumped to 0.3.2-draft.
+
 ## 0.3.1-draft
 
 ### Specification Changes
