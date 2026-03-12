@@ -4,7 +4,9 @@
 
 *Self-Describing APIs for LLM Agents*
 
-**Version: 0.3.0-draft**
+**Version: 0.3.1-draft**
+
+**Author: Ira Rainey**
 
 ## Specification, Implementation & Framework Integration Guide
 
@@ -49,7 +51,7 @@
   - [6.2 LLM-Native Fields](#62-llm-native-fields)
   - [6.3 Operational Fields](#63-operational-fields)
 - [7. Skills vs the OPTIONS Protocol](#7-skills-vs-the-options-protocol)
-  - [7.1 Comparison](#71-honest-comparison)
+  - [7.1 Comparison](#71-comparison)
   - [7.2 Skills as Abstraction](#72-skills-as-an-abstraction-layer)
   - [7.3 Where Each Belongs](#73-where-each-belongs)
 - [8. Why This Is a Solid Foundation](#8-why-this-is-a-solid-foundation)
@@ -63,6 +65,7 @@
   - [9.3 Schema Poisoning](#93-schema-poisoning)
   - [9.4 Prompt Injection](#94-prompt-injection-via-schema-fields)
   - [9.5 Rate Limiting](#95-rate-limiting-discovery)
+  - [9.6 Tool Surface Trust](#96-tool-surface-trust)
 - [10. What This Replaces](#10-what-this-replaces)
 - [11. Prior Art and Naming](#11-prior-art-and-naming)
   - [11.1 HAL vs HALO](#111-the-name-hal-vs-halo)
@@ -119,9 +122,7 @@ Even when structural schemas are auto-derived from code, the tool definitions st
 
 ### 1.2 The Drift Problem
 
-Schema drift is the default outcome of the current approach. The API changes, the tool description does not, and the LLM confidently calls the endpoint with stale parameters. No error surfaces at the description layer — just downstream failures that require log forensics to diagnose. In production systems with dozens of APIs maintained by different teams, this is not an edge case — it is the expected outcome.
-
-When API descriptions are maintained separately from the code — whether as OpenAPI specs, MCP server definitions, or tool descriptions — they tend to diverge over time.
+When API descriptions are maintained separately from the code — whether as OpenAPI specs, MCP server definitions, or tool descriptions — they tend to diverge over time. The API changes, the tool description does not, and the LLM calls the endpoint with stale parameters. No error appears at the description layer — just downstream failures that require log forensics to diagnose.
 
 | Problem | Consequence |
 |---|---|
@@ -142,7 +143,7 @@ Beyond drift, MCP creates a structural architecture problem with two options —
 
 For thin-wrapper MCP servers that only map 1:1 to existing API endpoints, however, the standalone service adds operational overhead with no value beyond protocol translation. HALO targets this space: APIs that are already HTTP endpoints and need to be discoverable by LLM agents without an intermediate service layer.
 
-**Option B: MCP embedded in the API.** This avoids the operational overhead but conflates two distinct responsibilities — serving domain logic and acting as an agent transport layer. These have different reasons to change and different lifecycles. If MCP evolves, is versioned, or is replaced, your domain service has to change with it. In a microservices architecture this contaminates service boundaries that were deliberately drawn.
+**Option B: MCP embedded in the API.** This avoids the operational overhead but conflates two distinct responsibilities — serving domain logic and acting as an agent transport layer. These have different reasons to change and different lifecycles. If MCP evolves, is versioned, or is replaced, your domain service has to change with it. In a microservices architecture this blurs service boundaries that were deliberately drawn.
 
 MCP's in-process stdio transport is a variant of Option B — it avoids the network hop (see section 1.4) but retains the protocol coupling, and the tool descriptions are still maintained as separate artifacts from the code that handles requests.
 
@@ -152,7 +153,7 @@ MCP's in-process stdio transport is a variant of Option B — it avoids the netw
 
 When deployed as a remote standalone service (not using in-process stdio transport), MCP does not just describe APIs — it proxies calls to them. Every tool invocation by an LLM travels through the MCP server before reaching the actual API. This introduces a network hop that would not otherwise exist.
 
-In isolation, one extra network call seems trivial. In practice it compounds into several distinct problems:
+This compounds into several problems:
 
 - **Latency** — every tool call carries the overhead of an additional network round-trip through the MCP layer before the real API is reached
 - **New failure point** — the MCP server can be down, overloaded, or misconfigured independently of the API it represents. A healthy API can be unreachable because its MCP proxy has failed
@@ -169,7 +170,7 @@ HALO is a protocol convention — language and platform agnostic — that can be
 
 HALO solves one specific problem: how an LLM agent discovers and invokes HTTP API endpoints as tools. In this context, a "tool" is a REST API endpoint — a URL that accepts a request and returns a response. MCP is a broader protocol that also defines primitives for resources, prompts, sampling, and sessions. HALO does not attempt to replace these capabilities — it targets tool discovery and invocation only, without the protocol and infrastructure overhead that MCP's broader feature set requires (see section 2.5 for applicability).
 
-HTTP has always had the mechanism to fix this. The OPTIONS method has existed since HTTP/1.1. Its semantic meaning is unambiguous: tell me what is possible at this endpoint. Its response body has never been standardised — which means it is effectively unclaimed territory.
+HTTP has always had the mechanism to fix this. The OPTIONS method has existed since HTTP/1.1. Its semantic meaning is unambiguous: tell me what is possible at this endpoint. Its response body has never been standardised — which means it is available for protocol conventions like HALO.
 
 ### 2.1 The OPTIONS Verb
 
@@ -250,7 +251,7 @@ OpenAPI provides the base fields these formats require: `operationId` maps to na
 - **OpenAPI description** (for a developer): *"Processes payment transactions using the Stripe billing integration with support for multi-currency settlements."*
 - **HALO `why` field** (for an LLM): *"Use to charge a customer immediately after order confirmation. Prefer /authorise if the charge amount may change before capture."*
 
-These serve different audiences. The OpenAPI description explains what the endpoint does and how it is implemented. The `why` field tells the LLM *when to choose this tool over alternatives* — routing guidance, not documentation. Trying to write one description that serves both results in serving neither well. HALO separates these concerns: the `description` field (derived from the docstring) serves human readers, while `why` serves the LLM.
+The OpenAPI description explains what the endpoint does. The `why` field tells the LLM *when to choose this tool over alternatives* — routing guidance, not documentation. HALO separates these: `description` serves human readers, `why` serves the LLM.
 
 Beyond descriptions, OpenAPI lacks fields that help an LLM reason about tool selection entirely:
 
@@ -264,11 +265,11 @@ Beyond descriptions, OpenAPI lacks fields that help an LLM reason about tool sel
 | `trust` | Schema signing and verification | None |
 | `observe` | Trace header injection, audit logging | None |
 
-> OpenAPI supports vendor extensions (`x-*`), so a team could define `x-llm-why`, `x-llm-effects`, etc. The mechanism to carry these fields exists. The difference is that HALO defines a *standard schema* for these fields — consistent naming, consistent structure, consistent tooling across implementations. Vendor extensions are ad-hoc by definition: every team invents its own convention, no framework knows how to consume them, and no contract exists between producer and consumer. HALO standardises what `x-*` leaves open.
+> OpenAPI supports vendor extensions (`x-*`), so a team could define `x-llm-why`, `x-llm-effects`, etc. The mechanism exists. The difference is that HALO defines a *standard schema* for these fields — consistent naming, consistent structure, consistent tooling across implementations. Vendor extensions are ad-hoc by definition: every team invents its own convention, no framework knows how to consume them, and no contract exists between producer and consumer.
 
 **3. OpenAPI requires non-trivial transformation for LLM consumption.**
 
-Converting an OpenAPI spec to tool definitions requires resolving `$ref` pointers, merging path/query/body parameters into a single flat object, navigating 7–8 levels of nesting, and synthesising names from `operationId`. Frameworks like LangChain ship converters that handle this, so the burden is not necessarily per-project — but it is a transformation layer that must be maintained as both OpenAPI and the framework evolve.
+Converting an OpenAPI spec to tool definitions requires resolving `$ref` pointers, merging path/query/body parameters into a single flat object, navigating deeply nested structures, and synthesising names from `operationId`. Frameworks like LangChain ship converters that handle this, so the burden is not necessarily per-project — but it is a transformation layer that must be maintained as both OpenAPI and the framework evolve.
 
 HALO schemas are flat, self-contained, and designed to be directly consumable — no dereferencing, no merging, no nesting traversal.
 
@@ -276,7 +277,7 @@ HALO schemas are flat, self-contained, and designed to be directly consumable �
 
 An OpenAPI spec is the same document regardless of who requests it. There is no standard mechanism for serving a filtered spec based on the caller's permissions. HALO's root manifest varies per request based on the authentication token — a read-only caller discovers only read endpoints. (See section 3.4.)
 
-#### Honest Assessment
+#### Assessment
 
 | Dimension | OpenAPI | HALO | Notes |
 |---|---|---|---|
@@ -294,9 +295,7 @@ OpenAPI is a comprehensive API description standard with a mature ecosystem. For
 
 ### 2.5 Where HALO Applies — and Where It Does Not
 
-Consumer LLM clients — ChatGPT, GitHub Copilot, Claude Desktop, Cursor, Windsurf — are coupled to MCP (or proprietary equivalents) for tool integration. HALO cannot be used directly with these clients. They do not support arbitrary HTTP tool-calling protocols, and there is no mechanism to add one.
-
-HALO cannot bypass the MCP coupling in consumer clients. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
+Consumer LLM clients — ChatGPT, GitHub Copilot, Claude Desktop, Cursor, Windsurf — are coupled to MCP (or proprietary equivalents) for tool integration. HALO cannot be used directly with these clients. They do not support arbitrary HTTP tool-calling protocols, and there is no mechanism to add one. For teams whose only use case is exposing tools to ChatGPT or Copilot, MCP is the required protocol. HALO's value in that scenario is as a drift-free backing store for an MCP server's tool definitions — not as a replacement for MCP itself.
 
 **HALO's primary audience is developer-built agent systems** — applications where the developer controls the agent runtime and chooses how tools are discovered and invoked. This includes:
 
@@ -381,7 +380,9 @@ This solves three problems simultaneously:
 |---|---|
 | Token efficiency | The LLM context only contains tools relevant to the current task, not the entire API surface |
 | Agent specialisation | A payment agent, comms agent, and admin agent all point at the same API but each sees only its own slice — no separate registrations needed |
-| Reduced tool surface | A read-only agent configured to request `OPTIONS /?tags=read` never discovers write tools in its context. This is advisory — not enforced. For true least-privilege, combine tag filtering with auth-gated discovery (section 3.4) so the server only returns tools the caller's credentials permit |
+| Reduced tool surface | A read-only agent configured to request `OPTIONS /?tags=read` never discovers write tools in its context |
+
+> **Note:** Tag filtering is advisory — not enforced. For true least-privilege, combine it with auth-gated discovery (section 3.4) so the server only returns tools the caller's credentials permit.
 
 ### 3.3 Recommended Tag Conventions
 
@@ -401,13 +402,17 @@ Tags are free-form strings. The following conventions are recommended as a basel
 
 When credentials are passed with the root OPTIONS request, the manifest reflects only what those credentials permit:
 
+**Read-only token:**
+
 ```json
-// Read-only token:
 { "tools": [
   { "url": "/api/customers/lookup", "method": "GET", "name": "lookup", "description": "Look up customer details", "tags": ["customers","read"] }
 ] }
+```
 
-// Full-access token:
+**Full-access token:**
+
+```json
 { "tools": [
   { "url": "/api/payments/charge",  "method": "POST", "name": "charge", "description": "Charge a payment method",   "tags": ["payments","write"] },
   { "url": "/api/customers/lookup", "method": "GET",  "name": "lookup", "description": "Look up customer details",  "tags": ["customers","read"] },
@@ -448,7 +453,7 @@ For general-purpose agents that don't know which tools are relevant in advance, 
 
 ```python
 async def discover_for_task(task: str, base_url: str) -> list:
-    # Step 1: fetch manifest — names, descriptions, and tags only
+    # Step 1: fetch manifest — names and descriptions only
     manifest = await options(base_url)
 
     # Step 2: ask the LLM which tools are relevant to the task
@@ -679,9 +684,9 @@ These fields exist to improve LLM reasoning and routing. Most have no direct equ
 
 ## 7. Skills vs the OPTIONS Protocol
 
-Skills — structured descriptions of business rules, domain knowledge, and tool orchestration logic — are an increasingly important layer in agent architecture. Understanding where skills and protocol-level tool description each belong is critical to building a well-structured agent system.
+Skills — structured descriptions of business rules, domain knowledge, and judgment — are an increasingly important layer in agent architecture. Understanding where skills and protocol-level tool description each belong is critical to building a well-structured agent system.
 
-### 7.1 Honest Comparison
+### 7.1 Comparison
 
 For most dimensions, skills win. They are faster to create, more expressive, and more flexible. The protocol's advantages are narrow but important: structural accuracy, automated auth detection, and explicit failure modes.
 
@@ -704,15 +709,13 @@ The industry is moving towards skills as a higher-level abstraction above raw to
 
 In this architecture, the drift concern changes shape. When a skill mediates between the LLM and the underlying tools, the separation between skill author (often a domain expert) and tool implementer (a developer) becomes a deliberate decoupling — not an accidental liability. The skill author describes *what should happen* in business terms; the developer ensures the tools *work correctly* at the mechanical level.
 
-HALO's LLM-native fields (`why`, `effects`, `next`) occupy the space between these two layers. In a skills-first architecture, these fields may be less relevant to the LLM — which sees skills, not raw tools — but remain valuable in the developer loop: they document the API's behaviour for the skill author, and they provide structured metadata that skill orchestration engines can consume programmatically.
-
-HALO describes what each API endpoint does, mechanically and precisely. Skills describe what the agent should do, contextually and expressively. When skills orchestrate HALO-described tools, the combination gives the skill author a precise, drift-free contract to build on — rather than prose documentation that may be stale.
+HALO's LLM-native fields (`why`, `effects`, `next`) occupy the space between these two layers. In a skills-first architecture, these fields may be less relevant to the LLM — which sees skills, not raw tools — but remain valuable in the developer loop: they document the API's behaviour for the skill author, and they provide structured metadata that skill orchestration engines can consume programmatically. When skills orchestrate HALO-described tools, the combination gives the skill author a precise, drift-free contract to build on — rather than prose documentation that may be stale.
 
 ### 7.3 Where Each Belongs
 
 | Approach | What It Handles |
 |---|---|
-| Skills | Business rules, domain knowledge, multi-tool orchestration, judgment, edge cases, tone. Things that require context, expressiveness, and cross-tool coordination. |
+| Skills | Business rules, domain knowledge, judgment, edge cases, tone. Things that require context and expressiveness. |
 | OPTIONS Protocol | Mechanical capability — what a single API endpoint does, exactly how to call it, what auth it needs, what side effects it has. Things that must be precise and must stay in sync with the live system. |
 
 > **Key principle:** Skills and schemas are not competing alternatives — they operate at different layers. Skills describe *what the agent should do*. Schemas describe *what the API can do*. When both are in skills the system is fragile at the mechanical layer. When both are in schemas the system is rigid at the behavioural layer. The combination is where the system becomes robust.
@@ -729,7 +732,7 @@ HALO's architectural advantages — no proxy layer, no sidecar service, direct a
 
 HALO's core guarantees — no structural drift, no additional service, direct call path — are conditional on the API implementing the protocol natively. When an API serves its own HALO schema from inside its own process, these properties hold by construction.
 
-For third-party APIs you do not control, it is technically possible to write a proxy that serves HALO schemas on behalf of the upstream API. This reintroduces drift risk (the schema is no longer derived from the same code) and operational overhead (an additional service to maintain). This is no different from the problems HALO solves for native implementations — it is simply the unavoidable cost of describing an API you do not own. Treat the proxy pattern as a last resort for legacy or third-party integrations where native adoption is not possible.
+For third-party APIs you do not control, it is technically possible to write a proxy that serves HALO schemas on behalf of the upstream API. This reintroduces drift risk (the schema is no longer derived from the same code) and operational overhead (an additional service to maintain) — the unavoidable cost of describing an API you do not own.
 
 ### 8.3 The Schema Is Testable
 
@@ -740,7 +743,7 @@ curl -X OPTIONS https://api.example.com/payments/charge \
      -H 'Accept: application/llm+json' | jq .
 ```
 
-Catch drift before it reaches production. Static schema files (like OpenAPI specs) can also be validated in CI, but they test the *file* — not the live endpoint. HALO's testability advantage is that the schema under test is the same one agents will receive at runtime.
+This catches drift before it reaches production. Static schema files (like OpenAPI specs) can also be validated in CI, but they test the *file* — not the live endpoint. HALO's testability advantage is that the schema under test is the same one agents will receive at runtime.
 
 ### 8.4 Additional Properties
 
@@ -769,15 +772,11 @@ The mitigation is straightforward: require the same credentials for discovery th
 
 ### 9.2 Information Disclosure
 
-Without auth-gating, OPTIONS handlers expose the full API surface to any client that sets `Accept: application/llm+json`. This includes endpoint paths, parameter schemas, auth types, rate limits, and — via `effects.undo` and `next` — relationships between endpoints that reveal internal workflow logic.
-
-This is not a HALO-specific concern. An OpenAPI spec, an MCP server's tool list, or a skill document all expose the same information. The difference is that HALO serves this information from the live API rather than a separate file or service. Auth-gating OPTIONS requests (section 9.1) addresses this directly.
+Without auth-gating, OPTIONS handlers expose the full API surface to any client that sets `Accept: application/llm+json`. This includes endpoint paths, parameter schemas, auth types, rate limits, and — via `effects.undo` and `next` — relationships between endpoints that reveal internal workflow logic. Auth-gating OPTIONS requests (section 9.1) addresses this directly.
 
 ### 9.3 Schema Poisoning
 
-If a HALO-compliant API is compromised or intercepted, the `next` and `effects.undo` fields could redirect an agent to malicious endpoints. The `why` and `description` fields could be altered to influence tool selection in unintended ways.
-
-This is a transport-level concern, not a HALO-specific one. Any source of tool definitions consumed by an LLM — MCP tool descriptions, OpenAPI specs, skill documents — is subject to the same risk if the source is compromised. The mitigations are standard:
+If a HALO-compliant API is compromised or intercepted, the `next` and `effects.undo` fields could redirect an agent to malicious endpoints. The `why` and `description` fields could be altered to influence tool selection in unintended ways. The mitigations are standard:
 
 - **TLS** — ensures schema responses are not tampered with in transit
 - **Schema signing** — HALO's `trust.signed` and `trust.jwks` fields (section 6.3) allow cryptographic verification of schema integrity
@@ -785,9 +784,7 @@ This is a transport-level concern, not a HALO-specific one. Any source of tool d
 
 ### 9.4 Prompt Injection via Schema Fields
 
-The `why`, `description`, and `examples` fields are free text consumed by the LLM. A malicious or compromised API could embed adversarial instructions in these fields that influence agent behaviour beyond the intended scope — for example, instructing the LLM to ignore its system prompt or call unrelated tools.
-
-This is inherent to LLM tool consumption, not specific to HALO. Every tool description mechanism — MCP, OpenAPI, LangChain tools, skills — carries free-text fields that the LLM interprets. The mitigations are the same as for any LLM system that consumes external input:
+The `why`, `description`, and `examples` fields are free text consumed by the LLM. A malicious or compromised API could embed adversarial instructions in these fields that influence agent behaviour beyond the intended scope — for example, instructing the LLM to ignore its system prompt or call unrelated tools. The mitigations are the same as for any system that consumes external input:
 
 - Treat schema content as untrusted input in the agent's prompt construction
 - Apply output filtering and validation on the agent side
@@ -796,6 +793,19 @@ This is inherent to LLM tool consumption, not specific to HALO. Every tool descr
 ### 9.5 Rate Limiting Discovery
 
 OPTIONS requests are cheap to serve but could be abused for endpoint enumeration or discovery-based denial of service. Standard rate limiting applies — the same controls used for any API endpoint. HALO's OPTIONS handlers appear in existing access logs and can be rate-limited separately from invocation using standard middleware.
+
+### 9.6 Tool Surface Trust
+
+A server trusted today could add new tools tomorrow. The agent discovers them automatically — no human approval required. This creates two risks:
+
+- **Surface expansion** — new tools appear between discovery calls. An agent that trusted five tools yesterday now sees six. The sixth could perform actions the consumer never anticipated.
+- **Tool shadowing** — a server adds a tool whose name or description competes with tools from other servers. The LLM selects based on description quality, not provenance, so a well-described malicious tool can displace a legitimate one.
+
+Mitigations are consumer-side:
+
+- **Manifest pinning** — snapshot the manifest and diff on re-discovery; alert or block on new or changed tools
+- **Tool allowlists** — maintain a list of approved tool URLs and ignore additions until explicitly approved
+- **Schema signing** (section 9.3) — covers integrity of existing tools but does not prevent new tools from appearing
 
 ---
 
@@ -806,7 +816,7 @@ HALO replaces the tool discovery and invocation layer — not the full scope of 
 | Current World | With HALO |
 |---|---|
 | MCP server process (remote) | OPTIONS handler runs inside the existing API — no sidecar, no separate deployment. (When MCP is embedded in-process, both share the same deployment.) |
-| Separation of concerns violation | OPTIONS is a native HTTP mechanism — self-description is not a separate concern |
+| Tool description separate from API code | OPTIONS is a native HTTP mechanism — self-description lives with the code it describes |
 | MCP proxy layer (remote) | Agent calls the API directly — no intermediate network hop. (Embedded MCP also avoids the extra hop, but retains protocol coupling — see section 1.3.) |
 | Tool registry with hand-written definitions | The API is the registry. Root OPTIONS returns the full manifest. Tool definitions are derived from code, not maintained separately. (MCP also supports dynamic tool lists via `tools/list` and `list_changed` notifications — the difference is where the definitions originate, not whether they can update.) |
 | Schema files (OpenAPI) | Schema lives on the route itself, versioned with the code |
@@ -842,7 +852,7 @@ HAL and HALO are not competing standards. A REST API using HAL for hypermedia na
 | HAL (Hypertext Application Language) | Hypermedia links in response bodies for API navigation. No LLM-native fields. Complementary. |
 | OpenAPI / Swagger | Comprehensive API description. Modern frameworks auto-generate it from code, reducing structural drift. However, OpenAPI is designed for code generators and human developers — not LLM agents. It lacks LLM-native reasoning fields, is served as a monolithic document with no standard subsetting mechanism, and requires non-trivial transformation for LLM consumption (`$ref` resolution, nesting traversal, parameter merging). See section 2.4 for a detailed comparison. |
 | agents.json | Structured contract format at `/.well-known/agents.json`. Closest in intent to HALO — covers tool schemas, authentication flows, and API-level rate limits. However, it is a static file that must be maintained separately from the code, inheriting drift risk for structural fields. HALO’s per-endpoint OPTIONS approach derives structural schemas from the code at runtime. |
-| MCP (Model Context Protocol) | Comprehensive agent protocol covering tools, resources, prompts, sampling, and sessions. HALO targets only the tool discovery and invocation layer — the dominant MCP use case. HALO and MCP are complementary: an MCP server can consume HALO schemas at runtime for drift-free tool definitions (see section 1.3). For consumer clients coupled to MCP (section 2.5), HALO serves as a backing store, not a replacement. |
+| MCP (Model Context Protocol) | Comprehensive agent protocol covering tools, resources, prompts, sampling, and sessions. HALO targets only the tool discovery and invocation layer — a core MCP use case. HALO and MCP are complementary: an MCP server can consume HALO schemas at runtime for drift-free tool definitions (see section 1.3). For consumer clients coupled to MCP (section 2.5), HALO serves as a backing store, not a replacement. |
 | HAL MCP Server | An MCP server wrapping HTTP APIs for LLMs. Adds the MCP layer rather than removing it. |
 | GraphQL Introspection | Runtime schema discovery — live and self-describing, but locked to GraphQL. HALO addresses this gap for REST. |
 | HATEOAS | Next-action links in responses. Spiritually similar to HALO's `next` field but designed for human navigation. |
@@ -967,14 +977,12 @@ Finally, the plugin registers OPTIONS handlers dynamically — one per route, an
 
 ```python
 def register_options_handlers(app, schemas: dict[str, list]):
-    # Root manifest handler
     @app.options('/')
     async def root_manifest(request: Request):
         if request.headers.get('accept') != 'application/llm+json':
             return Response(status_code=204)
-        # Auth-aware: filter tools by what this token can see
         token   = extract_token(request)
-        visible = filter_by_scope(schemas, token)
+        visible = filter_by_scope(schemas, token)  # auth-aware
         tools = []
         for path, schema_list in visible.items():
             for s in schema_list:
@@ -992,7 +1000,6 @@ def register_options_handlers(app, schemas: dict[str, list]):
             'tools':   tools,
         })
 
-    # Per-route handler — returns an array of schemas (one per method)
     for path, schema_list in schemas.items():
         def make_handler(response_list):
             @app.options(path)
@@ -1026,54 +1033,23 @@ class ChargeResponse(BaseModel):
 
 
 class ChargeRequest(BaseModel):
-    # ─── INPUT SCHEMA ───────────────────────────────────────────────────────
-    # Field type             → JSON Schema type in HALO input
-    # Field(description=...) → description shown to the LLM per field
-    # gt=0, max_length etc   → constraints in HALO input schema
-    # Literal[...]           → enum values in HALO input schema
-    # Fields without default are marked required: true automatically
     amount:      int   = Field(..., description='Amount in minor units (pence/cents)', gt=0)
     currency:    Literal['GBP', 'USD', 'EUR']    # → enum: [GBP, USD, EUR]
     customer_id: str   = Field(..., description='Customer identifier')
 
     model_config = ConfigDict(json_schema_extra={
-        # ─── HALO LLM-NATIVE FIELDS ─────────────────────────────────────────
-        # These are the ONLY fields that cannot be derived automatically.
-        # All other HALO fields come from the route and model definitions above.
         'llm': {
-            # TOOL DESCRIPTION (why) ────────────────────────────────────────
-            # This is what the LLM reads when deciding which tool to call.
-            # Write it as routing guidance, not as documentation.
-            # If omitted, the function docstring is used as a fallback.
             'why': 'Use to charge a customer immediately after order confirmation. '
                    'Prefer /authorise if the charge amount may change before capture.',
-
-            # TAGS ───────────────────────────────────────────────────────────
-            # Tags control which agents can discover this tool.
-            # An agent calling OPTIONS /?tags=payments sees this endpoint.
-            # An agent calling OPTIONS /?tags=read does not.
-            # Use the read/write convention plus a domain tag as a minimum.
             'tags': ['payments', 'write'],
-
             'effects': { 'reversible': True, 'undo': '/api/payments/refund' },
         }
     })
 
 
-# ─── ROUTE ──────────────────────────────────────────────────────────────────
-# @app.post      → call.method: POST in the HALO schema
-# path           → call.url in the HALO schema
-# response_model → output schema derived from ChargeResponse
-@app.post('/api/payments/charge', response_model=ChargeResponse)
-# ─── AUTH ───────────────────────────────────────────────────────────────────
-# HTTPBearer in Depends()       → auth.type: bearer in the HALO schema
-# APIKeyHeader would            → auth.type: apikey
-# OAuth2PasswordBearer would    → auth.type: oauth
-async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):
-    # ─── FALLBACK DESCRIPTION ───────────────────────────────────────────────
-    # If 'why' is not set in json_schema_extra, this docstring is used
-    # as the tool description instead. Always write a useful docstring.
-    '''Charge a payment method for a given amount.'''
+@app.post('/api/payments/charge', response_model=ChargeResponse)  # → call.method + call.url
+async def charge(body: ChargeRequest, token: HTTPBearer = Depends()):  # HTTPBearer → auth.type: bearer
+    '''Charge a payment method for a given amount.'''  # fallback if 'why' not set
     ...
 ```
 
@@ -1118,14 +1094,14 @@ The following are minimal reference implementations showing that the protocol re
 app.options('/api/payments/charge', (req, res) => {
   if (req.headers['accept'] !== 'application/llm+json')
     return res.set('Allow', 'POST').status(204).send();
-  res.json({
+  res.json([{
     description: 'Charge a payment method',
     call:    { method: 'POST', url: '/api/payments/charge' },
     auth:    { type: 'bearer', scopes: ['payments:write'] },
     input:   { amount: { type: 'number', required: true }, currency: { type: 'string', required: true } },
     tags:    ['payments', 'write'],
     effects: { reversible: true, undo: '/api/payments/refund' }
-  });
+  }]);
 });
 ```
 
@@ -1135,12 +1111,12 @@ app.options('/api/payments/charge', (req, res) => {
 [HttpOptions("/api/payments/charge")]
 public IActionResult ChargeSchema() {
     if (Request.Headers["Accept"] != "application/llm+json") return NoContent();
-    return Ok(new {
+    return Ok(new[] { new {
         description = "Charge a payment method",
         call        = new { method = "POST", url = "/api/payments/charge" },
         tags        = new[] { "payments", "write" },
         effects     = new { reversible = true }
-    });
+    }});
 }
 ```
 
@@ -1260,7 +1236,7 @@ Send `HTTP OPTIONS` with `Accept: application/llm+json` to any API endpoint. Rec
 
 **Skills vs Protocol**
 
-Skills and schemas operate at different layers. Skills describe business rules, domain knowledge, and multi-tool orchestration — they win on expressiveness, flexibility, and accessibility to domain experts. The OPTIONS protocol describes mechanical API capability with structural accuracy that cannot drift. The migration is not skills *to* protocol but skills *on top of* protocol.
+Skills and schemas operate at different layers. Skills describe business rules, domain knowledge, and judgment — they win on expressiveness, flexibility, and accessibility to domain experts. The OPTIONS protocol describes mechanical API capability with structural accuracy that cannot drift. The migration is not skills *to* protocol but skills *on top of* protocol.
 
 **What it removes**
 
@@ -1277,4 +1253,3 @@ One OPTIONS handler · Self-describing APIs · Tag-filtered discovery · Auth-aw
 *https://github.com/irarainey/halo*
 
 *For version history, see [CHANGELOG.md](CHANGELOG.md).*
-*https://github.com/irarainey/halo*

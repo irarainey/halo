@@ -93,13 +93,13 @@ class HaloClient:
         ).discover(tags=["payments"])
 
         # Access the full manifest
-        plugin.manifest
+        client.manifest
 
         # Access cached schemas
-        plugin.schemas
+        client.schemas
 
         # Fetch a specific tool schema
-        schema = await plugin.get_tool("/api/payments/charge")
+        schema = await client.get_tool("/api/payments/charge")
     """
 
     def __init__(
