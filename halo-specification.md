@@ -4,7 +4,9 @@
 
 *Self-Describing APIs for LLM Agents*
 
-**Version: 0.3.0-draft**
+**Version: 0.3.1-draft**
+
+**Author: Ira Rainey**
 
 ## Specification, Implementation & Framework Integration Guide
 
@@ -63,6 +65,7 @@
   - [9.3 Schema Poisoning](#93-schema-poisoning)
   - [9.4 Prompt Injection](#94-prompt-injection-via-schema-fields)
   - [9.5 Rate Limiting](#95-rate-limiting-discovery)
+  - [9.6 Tool Surface Trust](#96-tool-surface-trust)
 - [10. What This Replaces](#10-what-this-replaces)
 - [11. Prior Art and Naming](#11-prior-art-and-naming)
   - [11.1 HAL vs HALO](#111-the-name-hal-vs-halo)
@@ -448,7 +451,7 @@ For general-purpose agents that don't know which tools are relevant in advance, 
 
 ```python
 async def discover_for_task(task: str, base_url: str) -> list:
-    # Step 1: fetch manifest — names, descriptions, and tags only
+    # Step 1: fetch manifest — names and descriptions only
     manifest = await options(base_url)
 
     # Step 2: ask the LLM which tools are relevant to the task
@@ -712,7 +715,7 @@ HALO describes what each API endpoint does, mechanically and precisely. Skills d
 
 | Approach | What It Handles |
 |---|---|
-| Skills | Business rules, domain knowledge, multi-tool orchestration, judgment, edge cases, tone. Things that require context, expressiveness, and cross-tool coordination. |
+| Skills | Business rules, domain knowledge, judgment, edge cases, tone. Things that require context and expressiveness. |
 | OPTIONS Protocol | Mechanical capability — what a single API endpoint does, exactly how to call it, what auth it needs, what side effects it has. Things that must be precise and must stay in sync with the live system. |
 
 > **Key principle:** Skills and schemas are not competing alternatives — they operate at different layers. Skills describe *what the agent should do*. Schemas describe *what the API can do*. When both are in skills the system is fragile at the mechanical layer. When both are in schemas the system is rigid at the behavioural layer. The combination is where the system becomes robust.
@@ -796,6 +799,21 @@ This is inherent to LLM tool consumption, not specific to HALO. Every tool descr
 ### 9.5 Rate Limiting Discovery
 
 OPTIONS requests are cheap to serve but could be abused for endpoint enumeration or discovery-based denial of service. Standard rate limiting applies — the same controls used for any API endpoint. HALO's OPTIONS handlers appear in existing access logs and can be rate-limited separately from invocation using standard middleware.
+
+### 9.6 Tool Surface Trust
+
+A server trusted today could add new tools tomorrow. The agent discovers them automatically — no human approval required. This creates two risks:
+
+- **Surface expansion** — new tools appear between discovery calls. An agent that trusted five tools yesterday now sees six. The sixth could perform actions the consumer never anticipated.
+- **Tool shadowing** — a server adds a tool whose name or description competes with tools from other servers. The LLM selects based on description quality, not provenance, so a well-described malicious tool can displace a legitimate one.
+
+This is not HALO-specific. MCP's `tools/list` returns whatever the server chooses at call time, with the same exposure. OpenAPI specs are slightly less dynamic in practice but carry the same risk when re-fetched.
+
+Mitigations are consumer-side:
+
+- **Manifest pinning** — snapshot the manifest and diff on re-discovery; alert or block on new or changed tools
+- **Tool allowlists** — maintain a list of approved tool URLs and ignore additions until explicitly approved
+- **Schema signing** (section 9.3) — covers integrity of existing tools but does not prevent new tools from appearing
 
 ---
 

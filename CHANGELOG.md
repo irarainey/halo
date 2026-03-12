@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1-draft
+
+### Specification Changes
+
+- **Skills description (section 7):** Removed "multi-tool orchestration" and "cross-tool coordination" from the skills column — the LLM should infer tool composition from well-described individual tools, which is what HALO enables.
+- **Intent-based filtering comment (section 3.6):** Fixed code comment to say "names and descriptions only" now that tags are no longer in the example.
+- **Tool surface trust (section 9.6):** New section — consumer-side risks from tool surface expansion and tool shadowing across servers, with manifest pinning and allowlist mitigations.
+- **Version:** Bumped to 0.3.1-draft.
+
+### Documentation Changes
+
+- **README files:** Updated sample API references and restructured directory paths across root, agent-framework, semantic-kernel, and sample server READMEs (#2).
+
 ## 0.3.0-draft
 
 ### Specification Changes
