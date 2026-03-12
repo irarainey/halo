@@ -27,20 +27,22 @@ Tools can be filtered by tag (`OPTIONS /?tags=payments`) so agents only discover
 ### Schema Response Example
 
 ```json
-{
-  "description": "Charge a payment method for a given amount",
-  "call":    { "method": "POST", "url": "/api/payments/charge" },
-  "auth":    { "type": "bearer", "scopes": ["payments:write"] },
-  "input":   {
-    "amount":      { "type": "number", "required": true },
-    "currency":    { "type": "string", "enum": ["GBP", "USD", "EUR"] },
-    "customer_id": { "type": "string", "required": true }
-  },
-  "output":  { "charge_id": { "type": "string" }, "status": { "type": "string" } },
-  "why":     "Use to charge a customer immediately. Prefer /authorise for pre-auth flows.",
-  "effects": { "reversible": true, "undo": "/api/payments/refund" },
-  "tags":    ["payments", "write"]
-}
+[
+  {
+    "description": "Charge a payment method for a given amount",
+    "call":    { "method": "POST", "url": "/api/payments/charge" },
+    "auth":    { "type": "bearer", "scopes": ["payments:write"] },
+    "input":   {
+      "amount":      { "type": "number", "required": true },
+      "currency":    { "type": "string", "enum": ["GBP", "USD", "EUR"] },
+      "customer_id": { "type": "string", "required": true }
+    },
+    "output":  { "charge_id": { "type": "string" }, "status": { "type": "string" } },
+    "why":     "Use to charge a customer immediately. Prefer /authorise for pre-auth flows.",
+    "effects": { "reversible": true, "undo": "/api/payments/refund" },
+    "tags":    ["payments", "write"]
+  }
+]
 ```
 
 ## Key Features
